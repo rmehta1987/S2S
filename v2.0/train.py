@@ -46,8 +46,15 @@ torch._dynamo.config.optimize_ddp = False
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.set_float32_matmul_precision('high')
-torch.cuda.empty_cache()           
+torch.cuda.empty_cache()
 logging.info("Torch version: {}".format(torch.__version__))
+
+# --- S2S_BENCH instrumentation (gated; no effect when S2S_BENCH unset) ---
+import sys, hashlib, subprocess, statistics, csv
+BENCH = os.environ.get("S2S_BENCH") == "1"
+BENCH_WARMUP = int(os.environ.get("S2S_BENCH_WARMUP", "20"))
+BENCH_STEPS  = int(os.environ.get("S2S_BENCH_STEPS",  "80"))
+BENCH_CSV    = os.environ.get("S2S_BENCH_CSV", "bench_results.csv")
 
 
 # Enable CUDA graphs if supported (H100 friendly)
@@ -680,45 +687,69 @@ class Trainer():
 
         latitudes = self.latitudes
 
-        pbar = tqdm(total=total_iterations, bar_format='{l_bar}{bar:30}{r_bar}{bar:-10b}')
+        pbar = tqdm(total=total_iterations, bar_format='{l_bar}{bar:30}{r_bar}{bar:-10b}',
+                    disable=BENCH)
         running_results = {"batch_sizes": 0, "loss": 0.0}
+
+        # --- S2S_BENCH state ---
+        bench_step_times, bench_data_times, bench_compute_times = [], [], []
+        bench_scaler_skips = 0
+        bench_done = False
+        bench_loop_t0 = None
+        bench_n_loaders = len(self.train_data_loaders)
 
         for year_idx, train_data_loader in enumerate(self.train_data_loaders):
             logging.debug(f"Processing year idx {year_idx}")
-            
+
             current_dataset = self.train_datasets[year_idx]
             if self.params.train_year_to_year:
                 logging.debug(f"Processing year {self.params.train_year_start + year_idx}")
             else:
                 logging.debug(f"Processing years {self.params.train_year_start} to {self.params.train_year_end}")
-      
+
             #prefetch data   ---- Mahsa: prefetching one batch?!
             # nvtx.range_push("initial_prefetch")
             # data_iter = iter(train_data_loader)
             # nvtx.range_pop()  # End initial_prefetch
             # data = next(data_iter)
             for i, data in enumerate(train_data_loader):
-                logging.info("training on batch %d of year %d" % (i, self.params.train_year_start + year_idx))
+                if BENCH and self.iters >= BENCH_WARMUP + BENCH_STEPS:
+                    bench_done = True
+                    break
+                if not BENCH:
+                    logging.info("training on batch %d of year %d" % (i, self.params.train_year_start + year_idx))
                 if self.params.mode == "test" and i >= self.params.test_iterations:
                     logging.info("Test mode: only processing first batches")
                     pbar.update(total_iterations - self.iters)
                     data_time += time.time() - data_start
-                    break  
+                    break
                 else:
                     #nvtx.range_push(f"train_step{self.iters}")  # Start train_one_epoch
                     self.iters += 1
                     data_start = time.time()
-                    
+
+                    # Bench timing: sync, then start fetch+H2D window
+                    if BENCH:
+                        torch.cuda.synchronize()
+                        bench_t0 = time.perf_counter()
+                        if bench_loop_t0 is None and self.iters > BENCH_WARMUP:
+                            bench_loop_t0 = bench_t0
+
                     #nvtx.range_push("data_preparation") #Start data_preparation
                     input_surface, input_upper_air, target_surface, target_upper_air, target_diagnostic, varying_boundary_data = self._prepare_inputs_batch(data)
                     #nvtx.range_pop()  # End data_preparation
-           
+
+                    if BENCH:
+                        torch.cuda.synchronize()
+                        bench_t1 = time.perf_counter()
+
                     data_time += time.time() - data_start
-                    logging.info(f"Data preparation took {time.time() - data_start:.4f} seconds per iteration")
+                    if not BENCH:
+                        logging.info(f"Data preparation took {time.time() - data_start:.4f} seconds per iteration")
 
                     tr_start = time.time()
                     self.model.zero_grad()
-                
+
                     #define loss
                     #nvtx.range_push("forward_loss")  # Start forward_pass and calculate the loss
                     output_surface, output_upper_air, output_diagnostic, loss_sfc, loss_pl, loss_diagnostic, loss_vae, loss= self.cal_loss(
@@ -726,34 +757,50 @@ class Trainer():
                         target_diagnostic, target_surface, target_upper_air
                     )
                     #nvtx.range_pop()  # End forward_pass and calculate the loss
+
+                    bench_scale_before = self.scaler.get_scale() if BENCH else None
+
                     #nvtx.range_push("backpropagation")  # Start backpropagation and optimizer step
                     self.scaler.scale(loss).backward()
                     #nvtx.range_pop()  # End backpropagation and optimizer step
                     #nvtx.range_push("optimizer_step")  # Start optimizer step
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
-                    
+
                     tr_end_time = time.time()
-                    logging.info(f"Backpropagation and optimizer step took {tr_end_time - tr_start:.4f} seconds/ iteration")
+                    if not BENCH:
+                        logging.info(f"Backpropagation and optimizer step took {tr_end_time - tr_start:.4f} seconds/ iteration")
                     if self.params.scheduler == 'OneCycleLR':
                         self.scheduler.step()
+
+                    if BENCH:
+                        torch.cuda.synchronize()
+                        bench_t2 = time.perf_counter()
+                        bench_skipped = (self.scaler.get_scale() < bench_scale_before)
+                        if self.iters > BENCH_WARMUP:
+                            if bench_skipped:
+                                bench_scaler_skips += 1
+                            else:
+                                bench_data_times.append(bench_t1 - bench_t0)
+                                bench_compute_times.append(bench_t2 - bench_t1)
+                                bench_step_times.append(bench_t2 - bench_t0)
                     #nvtx.range_pop()  # End optimizer step
-                    
-                    if (i % 20 == 0): #only     log every 20 iterations to reduce overhead
+
+                    if not BENCH and (i % 20 == 0): #only     log every 20 iterations to reduce overhead
                         #nvtx.range_push(f"inference step {self.iters}")  # Start update_running_results
                         with torch.no_grad():
 
                             surface_lwrmse = weighted_rmse_torch_channels(output_surface, target_surface, latitudes)
                             upper_air_lwrmse = weighted_rmse_torch_3D(output_upper_air, target_upper_air, latitudes)
 
-           
+
                             diagnostic_lwrmse = weighted_rmse_torch_channels(output_diagnostic, target_diagnostic, latitudes)
                             mean_norm_lwrmse = torch.mean(torch.cat((surface_lwrmse, diagnostic_lwrmse, upper_air_lwrmse.reshape(output_upper_air.shape[0], -1)), dim = -1))
 
                             ######diagnoistic logging per iteration ###################
                             diagnostic_logs = self.diagnostic_log_per_iter(diagnostic_logs, diagnostic_lwrmse, surface_lwrmse, upper_air_lwrmse, current_dataset,
-                                                                            train_batch_loss = loss, 
-                                                                            train_batch_loss_sfc = loss_sfc, 
+                                                                            train_batch_loss = loss,
+                                                                            train_batch_loss_sfc = loss_sfc,
                                                                             train_batch_loss_upper_air = loss_pl,
                                                                             train_batch_loss_diagnostic =loss_diagnostic,
                                                                             train_batch_loss_vae = loss_vae,
@@ -763,17 +810,30 @@ class Trainer():
                                 #wandb.log(diagnostic_logs, step=(self.epoch-1) * total_iterations + self.iters)
                                 wandb.log(diagnostic_logs, step= self.iters)
                         #nvtx.range_pop()  # End update_running_results
-                    
+
                         # empty_cache() removed: it forces cudaDeviceSynchronize + cudaMemGetInfo
                         # and stalls the GPU pipeline every 20 iterations for no benefit.
                     tr_time += time.time() - tr_start
-                
-                    pbar.set_description(f"Year {self.params.train_year_start + year_idx}, Loss: {diagnostic_logs['train_batch_loss']:.4f}")
+
+                    if not BENCH:
+                        pbar.set_description(f"Year {self.params.train_year_start + year_idx}, Loss: {diagnostic_logs['train_batch_loss']:.4f}")
                 #nvtx.range_pop()  # End train_step
-              
-        
+
+            if bench_done:
+                break
+
         pbar.close()
         # pbar.update(1)
+
+        if BENCH:
+            self._bench_finalize(
+                step_times=bench_step_times,
+                data_times=bench_data_times,
+                compute_times=bench_compute_times,
+                scaler_skips=bench_scaler_skips,
+                loop_t0=bench_loop_t0,
+                n_loaders=bench_n_loaders,
+            )
 
         #nvtx.range_push("logging")  # Start logging
         logs = self.diagnostic_log_per_epoch(diagnostic_logs, train_loss = loss, epoch = self.epoch)
@@ -781,6 +841,134 @@ class Trainer():
         #nvtx.range_pop()  # End train_one_epoch
         return tr_time, data_time, logs
 
+
+    def _bench_finalize(self, step_times, data_times, compute_times, scaler_skips,
+                        loop_t0, n_loaders):
+        """Aggregate bench timings, write CSV row + env side-car on rank 0, then exit."""
+        n = len(step_times)
+
+        # Cross-rank max of peak GPU memory (bytes -> GB).
+        peak_local = torch.tensor([torch.cuda.max_memory_allocated()], device=self.device,
+                                  dtype=torch.float64)
+        if dist.is_initialized():
+            dist.all_reduce(peak_local, op=dist.ReduceOp.MAX)
+        peak_mem_gb = float(peak_local.item()) / 1e9
+
+        if self.world_rank != 0:
+            if dist.is_initialized():
+                dist.barrier()
+            sys.exit(0)
+
+        if n == 0:
+            logging.error("BENCH: no steps recorded (warmup=%d, requested=%d). Aborting.",
+                          BENCH_WARMUP, BENCH_STEPS)
+            if dist.is_initialized():
+                dist.barrier()
+            sys.exit(2)
+
+        elapsed = time.perf_counter() - loop_t0 if loop_t0 is not None else sum(step_times)
+        step_med   = statistics.median(step_times)
+        step_p90   = sorted(step_times)[int(n * 0.9)] if n >= 10 else max(step_times)
+        step_mean  = statistics.fmean(step_times)
+        step_std   = statistics.pstdev(step_times) if n > 1 else 0.0
+        data_med   = statistics.median(data_times)
+        comp_med   = statistics.median(compute_times)
+        cpu_prep_frac = data_med / step_med if step_med > 0 else 0.0
+        world      = dist.get_world_size() if dist.is_initialized() else 1
+        bs_per_gpu = int(self.params.batch_size)
+        global_bs  = bs_per_gpu * world
+        samples_s  = global_bs / step_med if step_med > 0 else 0.0
+
+        # P2-4: walltime sanity check. step_med * n should ≈ elapsed within 5%.
+        expected = step_med * n
+        if elapsed > 0 and abs(elapsed - expected) / elapsed > 0.05:
+            logging.error("BENCH: timer self-disagreement (elapsed=%.3fs, sum=%.3fs, "
+                          "deviation=%.1f%%). Refusing to record row.",
+                          elapsed, expected, 100 * abs(elapsed - expected) / elapsed)
+            if dist.is_initialized():
+                dist.barrier()
+            sys.exit(3)
+
+        # Resolve env: git sha, yaml hash, gpu, driver, torch/cuda.
+        def _safe_run(cmd):
+            try:
+                return subprocess.check_output(cmd, stderr=subprocess.DEVNULL,
+                                               text=True, timeout=10).strip()
+            except Exception:
+                return ""
+        git_sha = _safe_run(["git", "rev-parse", "--short=12", "HEAD"]) or "unknown"
+        gpu_info = _safe_run(["nvidia-smi", "--query-gpu=name,driver_version",
+                              "--format=csv,noheader"]).splitlines()
+        gpu_name = gpu_info[0] if gpu_info else "unknown"
+        yaml_path = (getattr(self.params, "_yaml_filename", None)
+                     or os.environ.get("S2S_YAML", ""))
+        yaml_sha = ""
+        if yaml_path and os.path.isfile(yaml_path):
+            with open(yaml_path, "rb") as fh:
+                yaml_sha = hashlib.sha256(fh.read()).hexdigest()[:16]
+
+        # AMP dtype is whatever autocast chose. Default cuda autocast = fp16.
+        amp_dtype = os.environ.get("S2S_AMP_DTYPE", "fp16")
+
+        # Number of loaders is a confound flag (P0-4 mitigation).
+        run_num = getattr(self.params, "run_num", "") or os.environ.get("S2S_RUN_NUM", "")
+
+        row = {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "git_sha": git_sha,
+            "run_num": run_num,
+            "n_gpus": world,
+            "batch_per_gpu": bs_per_gpu,
+            "amp_dtype": amp_dtype,
+            "ddp_find_unused": "true",  # baseline records the as-deployed value (train.py:424)
+            "n_loaders": n_loaders,
+            "step_med": f"{step_med:.6f}",
+            "step_p90": f"{step_p90:.6f}",
+            "step_mean": f"{step_mean:.6f}",
+            "step_std": f"{step_std:.6f}",
+            "cpu_prep_med": f"{data_med:.6f}",
+            "compute_med": f"{comp_med:.6f}",
+            "cpu_prep_frac": f"{cpu_prep_frac:.4f}",
+            "samples_per_s": f"{samples_s:.3f}",
+            "peak_mem_gb_max_rank": f"{peak_mem_gb:.3f}",
+            "scaler_skips": scaler_skips,
+            "n_steps_counted": n,
+        }
+
+        write_header = not os.path.exists(BENCH_CSV)
+        with open(BENCH_CSV, "a", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(row.keys()))
+            if write_header:
+                w.writeheader()
+            w.writerow(row)
+
+        env_path = os.path.join(os.path.dirname(os.path.abspath(BENCH_CSV)) or ".",
+                                f"bench_env_{run_num or git_sha}.txt")
+        with open(env_path, "w") as fh:
+            fh.write(f"run_num: {run_num}\n")
+            fh.write(f"git_sha: {git_sha}\n")
+            fh.write(f"torch: {torch.__version__}\n")
+            fh.write(f"torch.cuda: {torch.version.cuda}\n")
+            fh.write(f"gpu: {gpu_name}\n")
+            fh.write(f"yaml_path: {yaml_path}\n")
+            fh.write(f"yaml_sha256_16: {yaml_sha}\n")
+            fh.write(f"slurm_job_id: {os.environ.get('SLURM_JOB_ID','')}\n")
+            fh.write(f"slurm_nodelist: {os.environ.get('SLURM_NODELIST','')}\n")
+            fh.write(f"world_size: {world}\n")
+            fh.write(f"bench_warmup: {BENCH_WARMUP}\n")
+            fh.write(f"bench_steps: {BENCH_STEPS}\n")
+
+        logging.info(
+            "BENCH n=%d  step_med=%.3fs  step_p90=%.3fs  data_med=%.3fs  compute_med=%.3fs  "
+            "cpu_prep_frac=%.1f%%  samples/s=%.1f  peak_mem=%.2fGB  scaler_skips=%d  "
+            "n_loaders=%d  csv=%s",
+            n, step_med, step_p90, data_med, comp_med, 100 * cpu_prep_frac,
+            samples_s, peak_mem_gb, scaler_skips, n_loaders, BENCH_CSV,
+        )
+
+        if dist.is_initialized():
+            dist.barrier()
+        sys.exit(0)
 
 
     # @log_gpu_memory
