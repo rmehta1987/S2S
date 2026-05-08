@@ -17,8 +17,12 @@
 # No nsys, no NCCL_DEBUG, no TORCH_DISTRIBUTED_DEBUG — those distort timing.
 
 ulimit -l unlimited
-ml python
-source activate /project/pedramh/bing/env
+
+# Mamba activation (Midway): mamba shell hook must be eval'd in the batch shell
+# before `mamba activate` works.
+module load python/miniforge-25.3.0
+eval "$(mamba shell hook --shell bash)"
+mamba activate s2s
 
 module unload cuda
 module load cuda/12.6
