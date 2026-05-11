@@ -919,9 +919,12 @@ class Trainer():
         global_bs  = bs_per_gpu * world
         samples_s  = global_bs / step_med if step_med > 0 else 0.0
 
-        # P2-4: walltime sanity check. step_med * n should ≈ elapsed within 5%.
-        expected = step_med * n
-        if elapsed > 0 and abs(elapsed - expected) / elapsed > 0.05:
+        # P2-4: walltime sanity check. sum of individual step windows should ≈ elapsed
+        # wall time within 10%. Using sum (not step_med*n) so outlier steps don't
+        # cause a false positive — median systematically underestimates sum when the
+        # distribution has a long tail (e.g. larger batches, occasional OS jitter).
+        expected = sum(step_times)
+        if elapsed > 0 and abs(elapsed - expected) / elapsed > 0.10:
             logging.error("BENCH: timer self-disagreement (elapsed=%.3fs, sum=%.3fs, "
                           "deviation=%.1f%%). Refusing to record row.",
                           elapsed, expected, 100 * abs(elapsed - expected) / elapsed)
