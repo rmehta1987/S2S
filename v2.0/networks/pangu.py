@@ -68,6 +68,10 @@ from timm.models.layers import trunc_normal_, DropPath
 from utils.integrate import Integrator, forward_euler
 import os
 import xarray as xr
+import torch.cuda.nvtx as nvtx
+
+# Mirrors S2S_NVTX in train.py — set the same env var to activate ranges here.
+_NVTX = os.environ.get("S2S_NVTX") == "1"
 
 # Global flag for using Transformer Engine, initially set to True
 USE_TE = False
@@ -498,25 +502,24 @@ class PanguModel_Plasim(nn.Module):
         x = x.reshape(B, self.downscale_resolution[0], self.downscale_resolution[1], self.downscale_resolution[2], -1).permute(0, 4, 1, 2, 3)
         
         x_vae = x #8, 10, 23, 45, 384
-        # reshape(B, self.downscale_resolution[0],self.downscale_resolution[1],self.downscale_resolution[2],-1).permute(0, 4, 1, 2, 3) # should be #8, 10,23,45, 384
-        # print("x_vae reshaped after ", x_vae.shape) 
-        ###########VAE Enocer 1#################
-        mu = self.layer_mu(x_vae) # should be #8,192, 10,23,45, 
-        sigma = self.layer_sigma(x_vae) # should be #8, 192, 10,23,45, 
-        norm = self.reparameterize(mu, sigma) # should be #8,192, 10,23,45
+        ###########VAE Encoder 1 (prior — runs at training and inference)#################
+        if _NVTX: nvtx.range_push("vae_encoder1")
+        mu = self.layer_mu(x_vae)
+        sigma = self.layer_sigma(x_vae)
+        norm = self.reparameterize(mu, sigma)
         x_purb = self.layer_purturbation(norm)
-        #print("mu, sigma, norm, x_purb", mu.shape, sigma.shape, norm.shape, x_purb.shape) #8, 10, 23, 45, 192
+        if _NVTX: nvtx.range_pop()  # vae_encoder1
 
-        ###########VAE Enocer 1#################
         if train:
-            ###########VAE Enocer 2#################
+            ###########VAE Encoder 2 (posterior — training only, always checkpointed)#################
+            if _NVTX: nvtx.range_push("vae_encoder2")
             x_e2 = checkpoint(self.layer2_e2, x_e2, use_reentrant=self.use_reentrant)
             x_e2 = checkpoint(self.layer3_e3, x_e2, use_reentrant=self.use_reentrant)
-            x_e2_vae = x_e2.reshape(B, self.downscale_resolution[0], self.downscale_resolution[1], self.downscale_resolution[2], -1).permute(0, 4, 1, 2, 3) 
-
-            mu_e2 = self.layer_mu_e2(x_e2_vae) 
+            x_e2_vae = x_e2.reshape(B, self.downscale_resolution[0], self.downscale_resolution[1], self.downscale_resolution[2], -1).permute(0, 4, 1, 2, 3)
+            mu_e2 = self.layer_mu_e2(x_e2_vae)
             sigma_e2 = self.layer_sigma_e2(x_e2_vae)
-            norm_e2 = self.reparameterize(mu_e2, sigma_e2) 
+            norm_e2 = self.reparameterize(mu_e2, sigma_e2)
+            if _NVTX: nvtx.range_pop()  # vae_encoder2
 
 
         ##############Decoder ##################

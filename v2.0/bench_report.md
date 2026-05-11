@@ -160,11 +160,36 @@ A separate test script (`test/vae_collapse_test.py`) has been written to check w
 
 ## VAE ensemble generation — architecture notes
 
-The model generates 4 ensemble members by repeating each input sample 4 times and adding different random noise draws at the compressed bottleneck of the encoder. The noise is sampled from a distribution whose mean and variance are learned by the encoder. A second encoder branch, which only runs during training, processes the target (future) weather state and provides a reference distribution that the forecast encoder is trained to match. This is intended to teach the forecast encoder what the distribution of plausible future atmospheric states looks like in the latent space.
+From what I understand the VAE is used to measure uncertainity by generating 4 ensemble members via repeating each input sample 4 times and adding different random noise draws at the bottleneck of the encoder. The noise is sampled from a distribution whose mean and variance are learned by the encoder. A second encoder branch, which only runs during training, processes the target weather state and provides a reference distribution that the forecast encoder is trained to match. This is intended to teach the forecast encoder what the distribution of plausible future atmospheric states looks like in the latent space.  
 
-This design is known as a **conditional variational autoencoder with learned prior**. The same pattern appears in stochastic video prediction (teaching a model to generate diverse future frames) and open-domain dialogue generation (generating diverse responses). In all cases the idea is: show the model the future during training so it learns a prior distribution that, at inference time, produces samples consistent with real future states.
+**What the KL loss is actually doing:**
 
-**Why it is fragile:** The balance between the forecast loss and the regularisation loss is controlled by a single weight (`vae_loss_weight: 0.0001`). If this weight is too small — as it appears to be here — the regularisation signal is negligible and the encoder learns to collapse its variance toward zero, making all 4 ensemble members nearly identical. This is called posterior collapse.
+The KL divergence call is `KL(Encoder1 || Encoder2)`, computed between two learned Gaussian distributions — not between Encoder 1 and a fixed standard Gaussian. The loss function supports a standard Gaussian fallback only when no second distribution is passed; here Encoder 2's mean and variance are always provided. So the target distribution is not N(0,1) — it is whatever Encoder 2 produces when it sees the future weather state.
+
+Encoder 1's distribution is being pushed to match Encoder 2's distribution. At inference time only Encoder 1 runs, sampling noise that — if the KL training worked — resembles what Encoder 2 would have produced had it seen tomorrow's weather. Encoder 2 is purely a training-time teacher; it has no role at inference.
+
+The balance between the forecast loss and the regularisation loss is controlled by a single weight (`vae_loss_weight: 0.0001`). With this weight the KL signal is roughly 10,000 times weaker than the forecast loss, meaning Encoder 1 receives almost no gradient pressure to match Encoder 2's distribution. This leads to two independent failure modes: Encoder 1 never learns to imitate Encoder 2, and separately Encoder 1 may collapse its variance toward zero, making all 4 ensemble members nearly identical. Both failures are likely given the current weight.
+
+**KL formula verification:**
+
+The implementation computes KL(q ∥ p) where q = Encoder 1 and p = Encoder 2:
+
+```
+KL = 0.5 × (logvar_p − logvar_q + (var_q + (μ_q − μ_p)²) / var_p − 1)
+```
+
+This is the correct closed-form KL divergence between two diagonal Gaussians. The N(0,1) fallback (when Encoder 2 outputs are not provided) reduces to the standard single-encoder VAE formula `0.5 × (μ_q² + var_q − logvar_q − 1)`, also correct.
+
+**Why the math does not prevent collapse despite being correct:**
+
+The gradient of the KL with respect to Encoder 1's log-variance is:
+
+```
+∂KL/∂logvar_q = 0.5 × (−1 + var_q / var_p)
+```
+
+When variance collapses (var_q → 0) this becomes `−0.5 / var_p` — a negative gradient that pushes log-variance back up, resisting collapse. The math does try to prevent it. The problem is the weight: scaled by 0.0001 the anti-collapse gradient becomes `0.00005 / var_p`. With var_p typically around 0.1–1.0 this is at most 0.0005, while the CRPS gradient is order 1. The forecast loss outweighs the KL by roughly 2,000–20,000 to 1 at the gradient level, so collapse proceeds regardless of the correct formula.
+
 
 **Simpler alternatives that achieve the same goal:**
 
@@ -176,6 +201,31 @@ This design is known as a **conditional variational autoencoder with learned pri
 | Diffusion in latent space | Score-based sampling from a learned noise schedule | No (separate diffusion head) | Moderate — but principled and current state of the art for this problem |
 
 Google DeepMind's GenCast (2023) uses the diffusion approach on a Pangu-style backbone and currently represents the state of the art for probabilistic medium-range forecasting. The second encoder branch in this model adds training-time compute (it is always gradient-checkpointed) and inference-time architectural complexity for a benefit that depends entirely on the KL weight being correctly tuned.
+
+### Estimated compute cost of the second encoder branch
+
+The second encoder branch (`layer1_e2 → downsample_e2 → layer2_e2 → layer3_e3`) mirrors the main encoder's first three stages. The model configuration uses transformer block depths of `[2, 6, 6, 2]`, so the main encoder runs 2 + 6 + 6 = 14 transformer blocks and the second encoder runs the same 14 blocks on the target data. Both paths run sequentially on the same GPU stream.
+
+From the profiler run at batch size 1 (16-bit, original code), the entire forward pass takes **194 ms**. That 194 ms covers:
+- Main encoder (14 blocks + patch embedding + downsample)
+- VAE second encoder (14 blocks + downsample), always checkpointed
+- VAE first encoder (3 lightweight 1×1 convolutions) — negligible
+- Decoder (2 blocks + upsample + patch recovery)
+
+The decoder is shallower (2 blocks) and the patch embedding is a single convolution. The two 14-block encoders together are by far the dominant cost. Assuming the two encoders run at similar throughput and each accounts for roughly equal time, the second encoder is estimated at **40–70 ms of the 194 ms forward pass (20–36%)**.
+
+Because the second encoder is also gradient-checkpointed, its forward computation is re-run during the backward pass. This adds a further estimated **40–70 ms to the 425 ms backward pass**.
+
+**Combined estimated cost of the second encoder: 80–140 ms per training step**, or roughly **12–21% of total step time** at the current batch size of 1.
+
+| Component | Forward | Backward (recomputation) | Total per step |
+|---|---|---|---|
+| Second encoder (estimated) | 40–70 ms | 40–70 ms | **80–140 ms** |
+| As fraction of step time | 6–11% | 6–11% | **12–21%** |
+
+These are estimates based on the block count and the 194 ms forward time. The next Nsight profiling run includes dedicated NVTX markers (`vae_encoder1` and `vae_encoder2`) inside `pangu.py` so the actual measured numbers will replace these estimates. Once the profiler output is available, this table will be updated with measured values.
+
+If the posterior collapse test confirms the second encoder is not producing a useful training signal — which is likely given the 0.0001 regularisation weight — removing it would recover approximately **12–21% of training step time** at no cost to model quality.
 
 ---
 
