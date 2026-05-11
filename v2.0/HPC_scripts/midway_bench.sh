@@ -50,7 +50,7 @@ export S2S_BENCH_STEPS=80
 # --- Optimization variants (uncomment to measure a specific change) ---
 # AMP dtype: bf16 removes GradScaler entirely and is native on H100.
 # Verify no NaN by checking scaler_skips=0 in fp16 first (baseline does this).
-#export S2S_AMP_DTYPE=bf16
+export S2S_AMP_DTYPE=bf16
 
 # torch.compile: reduce-overhead is fast to compile; max-autotune maximises throughput.
 # Increase S2S_BENCH_WARMUP to 40+ when compiling to let the JIT settle.
