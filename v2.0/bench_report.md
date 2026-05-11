@@ -227,6 +227,12 @@ These are estimates based on the block count and the 194 ms forward time. The ne
 
 If the posterior collapse test confirms the second encoder is not producing a useful training signal — which is likely given the 0.0001 regularisation weight — removing it would recover approximately **12–21% of training step time** at no cost to model quality.
 
+Overall:
+
+This is a wierd approach to this problem, for example in Latent diffusion (GenCast approach) you learn a score function over the latent space conditioned on the current atmospheric state. At inference run many denoising steps to produce samples from the true posterior distribution of future states. The conditioning is the current state, which you always have, where as this one it relies on the future state and relies on the encoder2 learning the correct distribution.  
+
+The CVAE design is architecturally justified in settings where the condition is available at inference. Applied to weather forecasting it is a training trick with no inference-time analogue, competing against alternatives that achieves the same goal without the overhead or fragility.
+
 ---
 
 ## Notes on measurement reliability
