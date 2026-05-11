@@ -56,6 +56,11 @@ BENCH_WARMUP = int(os.environ.get("S2S_BENCH_WARMUP", "20"))
 BENCH_STEPS  = int(os.environ.get("S2S_BENCH_STEPS",  "80"))
 BENCH_CSV    = os.environ.get("S2S_BENCH_CSV", "bench_results.csv")
 
+# AMP dtype: set S2S_AMP_DTYPE=bf16 to use bfloat16 (no GradScaler needed on H100).
+# Default fp16 preserves the original training behaviour.
+_AMP_DTYPE_STR = os.environ.get("S2S_AMP_DTYPE", "fp16")
+_AMP_DTYPE = torch.bfloat16 if _AMP_DTYPE_STR == "bf16" else torch.float16
+
 
 # Enable CUDA graphs if supported (H100 friendly)
 torch.backends.cudnn.allow_cudnn_rnn_fallback = False
@@ -222,7 +227,7 @@ class Trainer():
         self.mask_bool, self.land_mask = self.get_land_mask_bool() #Bing: need to double check if the return is static values.
         self.model = self.get_model()
         self.optimizer = self.get_optimizer()
-        self.scaler = GradScaler()
+        self.scaler = GradScaler(enabled=(_AMP_DTYPE == torch.float16))
         if params.resuming:
             self.restore_checkpoint(params.checkpoint_path)
             logging.info("Resuming from checkpoint: %s", params.checkpoint_path)
@@ -413,21 +418,21 @@ class Trainer():
                 else:
                     self.model = PanguModel_Plasim(params, land_mask = self.land_mask, 
                                                 mask_fill = self.train_datasets[0].mask_fill).to(self.device)
-            # self.model = torch.compile(self.model, mode = 'default')
         else:
             raise Exception("not implemented")
-        # Mahsa 
-        # # Keep model weights in channels-last (NHWC) to avoid cuDNN layout conversions
-        # self.model = self.model.to(memory_format=torch.channels_last)
 
-        # _compile_mode = "max-autotune"
-        # self.model = torch.compile(self.model, mode=_compile_mode, fullgraph=False)
-        # logging.info(f"torch.compile enabled (mode={_compile_mode})")
-        
+        # torch.compile: set TORCH_COMPILE_MODE=reduce-overhead (or max-autotune) to enable.
+        # Compile before DDP wrap so the compiled graph covers the full forward pass.
+        # fullgraph=False tolerates graph breaks from custom ops / gradient checkpointing.
+        _compile_mode = os.environ.get("TORCH_COMPILE_MODE", "")
+        if _compile_mode:
+            self.model = torch.compile(self.model, mode=_compile_mode, fullgraph=False)
+            logging.info("torch.compile enabled (mode=%s)", _compile_mode)
+
         if dist.is_initialized():
             self.model = DistributedDataParallel(self.model,
                                                  device_ids=[params.local_rank],
-                                                 output_device=[params.local_rank], 
+                                                 output_device=[params.local_rank],
                                                  find_unused_parameters=True)
         #Logging
         if self.params.log_to_wandb:
@@ -763,6 +768,21 @@ class Trainer():
                     #nvtx.range_push("backpropagation")  # Start backpropagation and optimizer step
                     self.scaler.scale(loss).backward()
                     #nvtx.range_pop()  # End backpropagation and optimizer step
+
+                    # One-time diagnostic: log which params have no gradient after the first backward.
+                    # If none, find_unused_parameters=False + static_graph=True is safe.
+                    if self.iters == 1 and self.world_rank == 0:
+                        _unused = [n for n, p in self.model.named_parameters()
+                                   if p.requires_grad and p.grad is None]
+                        if _unused:
+                            logging.info("DDP unused-param check: %d params have grad=None "
+                                         "(find_unused_parameters=True must stay): first few: %s",
+                                         len(_unused), _unused[:3])
+                        else:
+                            logging.info("DDP unused-param check PASS: all parameters received "
+                                         "gradients — safe to set find_unused_parameters=False, "
+                                         "static_graph=True in get_model()")
+
                     #nvtx.range_push("optimizer_step")  # Start optimizer step
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
@@ -1051,7 +1071,7 @@ class Trainer():
         loss_pl = 0 
         loss_sfc = 0
         loss_vae = 0
-        with autocast(device_type="cuda"):
+        with autocast(device_type="cuda", dtype=_AMP_DTYPE):
         
             output_surface, output_upper_air, output_diagnostic, mu, sigma , mu2, sigma2 = self.model(input_surface, constant_boundary_data, 
                                                                 varying_boundary_data, input_upper_air, 
