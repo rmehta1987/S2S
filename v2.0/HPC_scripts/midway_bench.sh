@@ -22,7 +22,7 @@ ulimit -l unlimited
 # before `mamba activate` works.
 module load python/miniforge-25.3.0
 eval "$(mamba shell hook --shell bash)"
-mamba activate s2s
+mamba activate /project/pedramh/shared/S2S/v2.0/venv
 
 module unload cuda
 module load cuda/12.6
@@ -50,7 +50,7 @@ export S2S_BENCH_STEPS=80
 # CSV / env side-car location. Resolves to absolute path so it doesn't depend on cwd.
 export S2S_BENCH_CSV="${SLURM_SUBMIT_DIR}/bench_results.csv"
 
-config_file=../config/exp2.yaml
+config_file=/project/pedramh/shared/S2S/v2.0/config/exp2.yaml
 run_num="bench_$(date +%s)"
 
 # Surface the yaml path to the trainer so its sha can be recorded in the env file.
@@ -67,6 +67,6 @@ echo "NUM_GPUS=${NUM_GPUS}  run_num=${run_num}  csv=${S2S_BENCH_CSV}"
 torchrun \
     --standalone \
     --nproc_per_node="${NUM_GPUS}" \
-    ../train.py \
+    /project/pedramh/shared/S2S/v2.0/train.py \
     --yaml_config="${config_file}" \
     --run_num="${run_num}"

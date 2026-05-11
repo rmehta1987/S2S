@@ -1,0 +1,12 @@
+run_num: bench_1778510508
+git_sha: 7eb558d61698
+torch: 2.6.0+cu124
+torch.cuda: 12.4
+gpu: NVIDIA H100 NVL, 535.216.03
+yaml_path: /project/pedramh/shared/S2S/v2.0/config/exp2.yaml
+yaml_sha256_16: f97bb4db4c2958e3
+slurm_job_id: 49474929
+slurm_nodelist: midway3-0423
+world_size: 4
+bench_warmup: 20
+bench_steps: 80
