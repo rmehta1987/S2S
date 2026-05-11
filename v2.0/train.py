@@ -433,11 +433,21 @@ class Trainer():
             self.model = torch.compile(self.model, mode=_compile_mode, fullgraph=False)
             logging.info("torch.compile enabled (mode=%s)", _compile_mode)
 
+        # layer_perturbation2's forward call is commented out (pangu.py:524).
+        # layer_purturbation_e2 is defined but never called in forward.
+        # Freeze both so DDP can use find_unused_parameters=False + static_graph=True.
+        _dead_modules = {'layer_perturbation2', 'layer_purturbation_e2'}
+        for mod_name, mod in self.model.named_modules():
+            if mod_name in _dead_modules:
+                mod.requires_grad_(False)
+                logging.info("Froze dead-code module %s (no forward call)", mod_name)
+
         if dist.is_initialized():
             self.model = DistributedDataParallel(self.model,
                                                  device_ids=[params.local_rank],
                                                  output_device=[params.local_rank],
-                                                 find_unused_parameters=True)
+                                                 find_unused_parameters=False,
+                                                 static_graph=True)
         #Logging
         if self.params.log_to_wandb:
             wandb.watch(self.model)
@@ -950,7 +960,7 @@ class Trainer():
             "n_gpus": world,
             "batch_per_gpu": bs_per_gpu,
             "amp_dtype": amp_dtype,
-            "ddp_find_unused": "true",  # baseline records the as-deployed value (train.py:424)
+            "ddp_find_unused": "false",
             "n_loaders": n_loaders,
             "step_med": f"{step_med:.6f}",
             "step_p90": f"{step_p90:.6f}",
