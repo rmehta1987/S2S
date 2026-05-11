@@ -52,10 +52,11 @@ export S2S_BENCH_STEPS=80
 # Verify no NaN by checking scaler_skips=0 in fp16 first (baseline does this).
 export S2S_AMP_DTYPE=bf16
 
-# torch.compile: reduce-overhead is fast to compile; max-autotune maximises throughput.
-# Increase S2S_BENCH_WARMUP to 40+ when compiling to let the JIT settle.
-#export TORCH_COMPILE_MODE=reduce-overhead
-#export S2S_BENCH_WARMUP=40
+# torch.compile: reduce-overhead fuses element-wise kernels; max-autotune maximises throughput.
+# Warmup raised to 40 so the JIT graph capture and Triton kernel compilation settle
+# before timing starts — first few compiled steps are much slower than steady state.
+export TORCH_COMPILE_MODE=reduce-overhead
+export S2S_BENCH_WARMUP=40
 
 # CSV / env side-car location. Resolves to absolute path so it doesn't depend on cwd.
 export S2S_BENCH_CSV="${SLURM_SUBMIT_DIR}/bench_results.csv"

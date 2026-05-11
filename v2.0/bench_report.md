@@ -130,28 +130,52 @@ Zero numeric instability events with brain 16-bit confirms the model is safe to 
 
 ## Summary table
 
-| Configuration | Step time | Throughput | vs baseline | Memory |
-|---|---|---|---|---|
-| **Baseline** (16-bit, batch=1/card) | 0.639 s | 6.26 samples/s | — | 35.0 GB |
-| Baseline repeat | 0.638 s | 6.27 samples/s | +0.05% | 35.0 GB |
-| Brain 16-bit + static graph + batch=3/card | 3.314 s | 3.62 samples/s | −42% | 97.0 GB ⚠ |
-| **Brain 16-bit + static graph, batch=1/card** | **0.607 s** | **6.59 samples/s** | **+5.3%** | **35.0 GB** |
+| Configuration | Step time | Throughput | vs baseline | Memory | Skips |
+|---|---|---|---|---|---|
+| **Baseline** (16-bit, batch=1/card) | 0.639 s | 6.26 samples/s | — | 35.0 GB | 0 |
+| Baseline repeat | 0.638 s | 6.27 samples/s | +0.05% | 35.0 GB | 0 |
+| Brain 16-bit + static graph, batch=3/card | 3.314 s | 3.62 samples/s | −42% | 97.0 GB ⚠ | 0 |
+| Brain 16-bit + static graph, batch=1/card | 0.607 s | 6.59 samples/s | +5.3% | 35.0 GB | 0 |
+| 16-bit + static graph, batch=2/card | 1.160 s | 6.90 samples/s | +10.1% | 69.0 GB | 4 ⚠ |
+| **Brain 16-bit + static graph, batch=2/card** | **1.146 s** | **6.98 samples/s** | **+11.4%** | **69.0 GB** | **0** |
+
+The best confirmed configuration is brain 16-bit arithmetic with the static distributed training graph and 2 samples per card — **+11.4% throughput, zero numeric instability events, 73% graphics memory utilisation**.
 
 ---
 
-## Remaining experiments planned
+## Remaining experiments
 
-**Experiment 3 — Larger batch, unchanged format (in progress):**  
-Set 2 samples per card (8 global), keep 16-bit arithmetic and the other baseline settings. Estimated peak memory ~55 GB, well within limits. Expected throughput gain ~1.8×. This isolates the effect of batch scaling alone.
+**Next — Just-in-time compilation (in progress):**  
+PyTorch's just-in-time kernel compiler (`torch.compile`, mode `reduce-overhead`) fuses consecutive element-wise operations into single GPU kernels. The profiler found that element-wise operations are the single largest consumer of GPU time across the 80 measured steps — over 30 seconds of the total recorded time — because they are currently launched as hundreds of individual small kernels. Compilation would collapse many of these into a single fused operation, reducing both launch overhead and memory bandwidth pressure.
 
-**Experiment 4 — Brain 16-bit combined with larger batch:**  
-Combine the confirmed 5.3% gain from Experiment 2 with the batch scaling from Experiment 3.
+The warmup period has been raised from 20 to 40 steps to allow Triton kernel compilation to settle before timing starts. The compiled steady-state throughput is what will be recorded. Both the wall-clock benchmark script and the Nsight profiling script have been updated to use `reduce-overhead` mode and brain 16-bit arithmetic simultaneously, so the new profile can be compared directly against the original.
 
-**Experiment 5 — Reduce gradient checkpointing:**  
-Change `checkpointing: 2` to a lower recomputation frequency or disable it entirely at the current batch size. The profiler shows this is the largest single source of wasted computation. The trade-off is higher memory use, which limits how large the batch can be simultaneously.
+**Gradient checkpointing investigation:**  
+Code analysis revealed that transformer block checkpointing is commented out in the source — the `checkpointing` value in the configuration file only controls 4 lightweight patch recovery operations, not the transformer blocks themselves. Changing `checkpointing: 2` to `checkpointing: 1` has no effect. Setting it to `0` disables only those 4 patch recovery operations and is expected to give a small gain. The 2.2× backward-to-forward ratio observed in the profiler is inherent to the model depth, not recomputation overhead.
 
-**Experiment 6 — Just-in-time compilation:**  
-Enable PyTorch's just-in-time kernel compilation (`torch.compile`). The profiler found that element-wise operations (activation functions, residual additions, bias terms) account for over 30 seconds of the total recorded computation time across 320 profiled steps. Compilation would fuse many of these into single operations, reducing kernel launch overhead and improving memory access patterns.
+**VAE ensemble quality investigation:**  
+A separate test script (`test/vae_collapse_test.py`) has been written to check whether the variational autoencoder is generating meaningful ensemble diversity or has collapsed to a deterministic model. See the VAE section below for context.
+
+---
+
+## VAE ensemble generation — architecture notes
+
+The model generates 4 ensemble members by repeating each input sample 4 times and adding different random noise draws at the compressed bottleneck of the encoder. The noise is sampled from a distribution whose mean and variance are learned by the encoder. A second encoder branch, which only runs during training, processes the target (future) weather state and provides a reference distribution that the forecast encoder is trained to match. This is intended to teach the forecast encoder what the distribution of plausible future atmospheric states looks like in the latent space.
+
+This design is known as a **conditional variational autoencoder with learned prior**. The same pattern appears in stochastic video prediction (teaching a model to generate diverse future frames) and open-domain dialogue generation (generating diverse responses). In all cases the idea is: show the model the future during training so it learns a prior distribution that, at inference time, produces samples consistent with real future states.
+
+**Why it is fragile:** The balance between the forecast loss and the regularisation loss is controlled by a single weight (`vae_loss_weight: 0.0001`). If this weight is too small — as it appears to be here — the regularisation signal is negligible and the encoder learns to collapse its variance toward zero, making all 4 ensemble members nearly identical. This is called posterior collapse.
+
+**Simpler alternatives that achieve the same goal:**
+
+| Approach | How diversity is generated | Second encoder needed | Fragility |
+|---|---|---|---|
+| This model (learned prior) | Noise sampled from encoder distribution, KL training against posterior | Yes — runs on target data during training | High — KL weight must be tuned carefully |
+| Fixed noise injection | Add scaled random noise directly at bottleneck, no learned distribution | No | Low |
+| Monte Carlo dropout | Keep dropout active at inference, run 4 passes with different dropout masks | No | Low |
+| Diffusion in latent space | Score-based sampling from a learned noise schedule | No (separate diffusion head) | Moderate — but principled and current state of the art for this problem |
+
+Google DeepMind's GenCast (2023) uses the diffusion approach on a Pangu-style backbone and currently represents the state of the art for probabilistic medium-range forecasting. The second encoder branch in this model adds training-time compute (it is always gradient-checkpointed) and inference-time architectural complexity for a benefit that depends entirely on the KL weight being correctly tuned.
 
 ---
 

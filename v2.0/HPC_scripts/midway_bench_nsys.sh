@@ -46,11 +46,15 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export OMP_NUM_THREADS=2
 export MKL_NUM_THREADS=2
 
-# Bench knobs — same as midway_bench.sh so results are comparable.
+# Bench knobs — must match midway_bench.sh so results are comparable.
 export S2S_BENCH=1
-export S2S_BENCH_WARMUP=20
+export S2S_BENCH_WARMUP=40   # raised from 20: compiled steps are slow until Triton kernels settle
 export S2S_BENCH_STEPS=80
-export S2S_NVTX=1          # activate NVTX ranges + cudaProfilerStart/Stop
+export S2S_NVTX=1            # activate NVTX ranges + cudaProfilerStart/Stop
+
+# Match the same optimisation flags as midway_bench.sh.
+export S2S_AMP_DTYPE=bf16
+export TORCH_COMPILE_MODE=reduce-overhead
 
 export S2S_BENCH_CSV="${SLURM_SUBMIT_DIR}/bench_results.csv"
 
