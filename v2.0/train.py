@@ -55,6 +55,10 @@ BENCH = os.environ.get("S2S_BENCH") == "1"
 BENCH_WARMUP = int(os.environ.get("S2S_BENCH_WARMUP", "20"))
 BENCH_STEPS  = int(os.environ.get("S2S_BENCH_STEPS",  "80"))
 BENCH_CSV    = os.environ.get("S2S_BENCH_CSV", "bench_results.csv")
+# NVTX ranges for Nsight Systems. Set S2S_NVTX=1 together with nsys capture-range.
+# When BENCH=1 the code also emits cudaProfilerStart/Stop to bracket only the
+# measured steps, so nsys --capture-range=cudaProfilerApi skips warmup entirely.
+NVTX = os.environ.get("S2S_NVTX") == "1"
 
 # AMP dtype: set S2S_AMP_DTYPE=bf16 to use bfloat16 (no GradScaler needed on H100).
 # Default fp16 preserves the original training behaviour.
@@ -729,7 +733,7 @@ class Trainer():
                     data_time += time.time() - data_start
                     break
                 else:
-                    #nvtx.range_push(f"train_step{self.iters}")  # Start train_one_epoch
+                    if NVTX: nvtx.range_push(f"step_{self.iters}")
                     self.iters += 1
                     data_start = time.time()
 
@@ -739,10 +743,12 @@ class Trainer():
                         bench_t0 = time.perf_counter()
                         if bench_loop_t0 is None and self.iters > BENCH_WARMUP:
                             bench_loop_t0 = bench_t0
+                            if NVTX:
+                                torch.cuda.cudart().cudaProfilerStart()
 
-                    #nvtx.range_push("data_preparation") #Start data_preparation
+                    if NVTX: nvtx.range_push("data_prep")
                     input_surface, input_upper_air, target_surface, target_upper_air, target_diagnostic, varying_boundary_data = self._prepare_inputs_batch(data)
-                    #nvtx.range_pop()  # End data_preparation
+                    if NVTX: nvtx.range_pop()  # data_prep
 
                     if BENCH:
                         torch.cuda.synchronize()
@@ -756,18 +762,18 @@ class Trainer():
                     self.model.zero_grad()
 
                     #define loss
-                    #nvtx.range_push("forward_loss")  # Start forward_pass and calculate the loss
+                    if NVTX: nvtx.range_push("forward_loss")
                     output_surface, output_upper_air, output_diagnostic, loss_sfc, loss_pl, loss_diagnostic, loss_vae, loss= self.cal_loss(
                         input_surface, self.constant_boundary_data, varying_boundary_data, input_upper_air,
                         target_diagnostic, target_surface, target_upper_air
                     )
-                    #nvtx.range_pop()  # End forward_pass and calculate the loss
+                    if NVTX: nvtx.range_pop()  # forward_loss
 
                     bench_scale_before = self.scaler.get_scale() if BENCH else None
 
-                    #nvtx.range_push("backpropagation")  # Start backpropagation and optimizer step
+                    if NVTX: nvtx.range_push("backward")
                     self.scaler.scale(loss).backward()
-                    #nvtx.range_pop()  # End backpropagation and optimizer step
+                    if NVTX: nvtx.range_pop()  # backward
 
                     # One-time diagnostic: log which params have no gradient after the first backward.
                     # If none, find_unused_parameters=False + static_graph=True is safe.
@@ -783,9 +789,10 @@ class Trainer():
                                          "gradients — safe to set find_unused_parameters=False, "
                                          "static_graph=True in get_model()")
 
-                    #nvtx.range_push("optimizer_step")  # Start optimizer step
+                    if NVTX: nvtx.range_push("optimizer")
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
+                    if NVTX: nvtx.range_pop()  # optimizer
 
                     tr_end_time = time.time()
                     if not BENCH:
@@ -804,8 +811,6 @@ class Trainer():
                                 bench_data_times.append(bench_t1 - bench_t0)
                                 bench_compute_times.append(bench_t2 - bench_t1)
                                 bench_step_times.append(bench_t2 - bench_t0)
-                    #nvtx.range_pop()  # End optimizer step
-
                     if not BENCH and (i % 20 == 0): #only     log every 20 iterations to reduce overhead
                         #nvtx.range_push(f"inference step {self.iters}")  # Start update_running_results
                         with torch.no_grad():
@@ -837,7 +842,7 @@ class Trainer():
 
                     if not BENCH:
                         pbar.set_description(f"Year {self.params.train_year_start + year_idx}, Loss: {diagnostic_logs['train_batch_loss']:.4f}")
-                #nvtx.range_pop()  # End train_step
+                    if NVTX: nvtx.range_pop()  # step_{N}
 
             if bench_done:
                 break
@@ -865,6 +870,11 @@ class Trainer():
     def _bench_finalize(self, step_times, data_times, compute_times, scaler_skips,
                         loop_t0, n_loaders):
         """Aggregate bench timings, write CSV row + env side-car on rank 0, then exit."""
+        # Close the nsys capture range before the all_reduce so the profiler
+        # doesn't record collective ops that aren't part of a training step.
+        if NVTX:
+            torch.cuda.cudart().cudaProfilerStop()
+
         n = len(step_times)
 
         # Cross-rank max of peak GPU memory (bytes -> GB).
