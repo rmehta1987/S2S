@@ -231,7 +231,79 @@ Overall:
 
 This is a wierd approach to this problem, for example in Latent diffusion (GenCast approach) you learn a score function over the latent space conditioned on the current atmospheric state. At inference run many denoising steps to produce samples from the true posterior distribution of future states. The conditioning is the current state, which you always have, where as this one it relies on the future state and relies on the encoder2 learning the correct distribution.  
 
-The CVAE design is architecturally justified in settings where the condition is available at inference. Applied to weather forecasting it is a training trick with no inference-time analogue, competing against alternatives that achieves the same goal without the overhead or fragility.
+The CVAE design is architecturally justified in settings where the condition is available at inference. Applied to weather forecasting it is a training trick with no inference-time analogue, competing against alternatives that achieves the same goal without the overhead or fragility.  The current 2nd encoder **DOUBLES** the training time.
+
+The S2S model here is trying to do what GenCast does by producing an ensemble from a Pangu-style backbone — but using a CVAE approach that has design problems, **trying to force a shoe to fit**. GenCast demonstrates that the diffusion approach solves the same problem cleanly: no second encoder, no KL weight to tune, no posterior collapse
+risk, and the inference-time conditioning (current atmospheric state) is available at every denoising step. The trade-off is inference cost — 50 diffusion chains are slower than one forward pass in pengu.
+
+---
+
+## DSI H200 cluster comparison — why 4 GPUs is slower than expected
+
+The Data Science Institute provided access to a node with 4 × H200 GPUs and ran inference profiles that we compared against the NVIDIA cluster H100 profiles. Their observation was that GPU utilisation was low — roughly in the 15–23% range — and that running 4 GPUs did not speed things up proportionally. We confirmed this with Nsight Systems traces from three configurations: DSI H200 with 1 GPU, DSI H200 with 4 GPUs, and the NVIDIA H100 with 4 GPUs (which is the cluster where the training benchmarks above were collected).
+
+The profiles were exported to SQLite with `nsys export --type=sqlite` and analysed with `v2.0/HPC_scripts/compare_nsys.py`.
+
+### The compute work is identical everywhere
+
+The first thing the profiler makes clear is that the actual on-GPU computation — the time the graphics card spends executing model kernels — is nearly the same across all three setups: roughly 14 seconds per GPU on DSI and 15 seconds per GPU on NVIDIA. The H200 is not slower than the H100 at doing the work itself. The gap is entirely in the time the GPU spends sitting idle between bursts of work.
+
+| Setup | Per-GPU compute (active_ms) | Elapsed wall time (window_ms) | Utilisation |
+|---|---|---|---|
+| DSI H200 — 1 GPU | 13,977 ms | 35,736 ms | 39% |
+| DSI H200 — 4 GPUs (GPU0) | 13,928 ms | 92,477 ms | 15% |
+| DSI H200 — 4 GPUs (GPU1–3) | ~13,940 ms | 60–81k ms | 17–23% |
+| NVIDIA H100 — 4 GPUs (GPU0) | 15,302 ms | 41,189 ms | 37% |
+| NVIDIA H100 — 4 GPUs (GPU1–3) | ~15,295 ms | 27–30k ms | 50–57% |
+
+The DSI 4-GPU run takes roughly 2.2–2.8× longer wall time than the NVIDIA 4-GPU run for the same amount of real computation.
+
+### Where is the time going?
+
+Between every pair of consecutive GPU kernels there is either zero gap (the next kernel starts immediately) or a positive idle period where the GPU is waiting for the CPU to queue more work. We measured all of these gaps on GPU0 across all three profiles.
+
+| Gap size | DSI H200 1-GPU | DSI H200 4-GPU | NVIDIA H100 4-GPU |
+|---|---|---|---|
+| ≤ 10 ms (normal dispatch) | 468,021 | 467,623 | 469,637 |
+| **10–50 ms (frequent short stalls)** | **41** | **423** | **27** |
+| 50–100 ms | 7 | 8 | 12 |
+| 100–500 ms | 19 | 20 | 12 |
+| > 500 ms (I/O or barrier stalls) | 7 | 21 | 14 |
+| **Total idle time in gaps > 10 ms** | **19,821 ms** | **72,026 ms** | **24,667 ms** |
+
+The 10–50 ms bucket is the smoking gun. It goes from 41 occurrences on DSI with 1 GPU, to 423 occurrences on DSI with 4 GPUs, while NVIDIA with 4 GPUs has only 27. These are not data loading stalls (those would show up as gaps of 100 ms or more); they are the GPU going briefly idle because the Python dispatch loop cannot queue work fast enough to keep all four cards fed simultaneously.
+
+In plain terms: with 1 GPU the data loader and Python process can just about keep up, so the card only idles occasionally. With 4 GPUs, the same single Python process must prepare and transfer data for four cards in parallel. It cannot, so each card repeatedly waits 20–40 ms for its next batch. Multiply 423 waits by ~30 ms average and you account for most of the extra 50 seconds the DSI 4-GPU run takes compared to the NVIDIA run.
+
+### PCIe bandwidth contention makes it worse
+
+On the NVIDIA cluster, each GPU's host-to-device transfer bandwidth is consistent whether using 1 GPU or 4 — roughly 42–45 GB/s per card. On DSI, the single-GPU bandwidth is 41.6 GB/s, but under 4-GPU load GPU0 and GPU3 drop to 31–33 GB/s. This is PCIe contention: the DSI node's four H200s appear to share fewer PCIe root complex lanes, so when all four GPUs are simultaneously pulling data from the CPU they compete with each other. The slower data transfer contributes directly to the 10–50 ms stalls above.
+
+| Setup | GPU0 bandwidth | GPU1 | GPU2 | GPU3 |
+|---|---|---|---|---|
+| DSI H200 1-GPU | 41.6 GB/s | — | — | — |
+| DSI H200 4-GPUs | **31.5 GB/s** | 38.6 | 37.4 | **32.7** |
+| NVIDIA H100 4-GPUs | 44.7 GB/s | 41.8 | 43.6 | 44.3 |
+
+### NCCL is not the issue
+
+No NCCL collective kernels appeared in any of the three profiles. These are independent data-parallel inference runs — each GPU processes its own batch and there is no gradient synchronisation or inter-GPU communication at all. The interconnect speed between the H200s is irrelevant here.
+
+### Is pinned memory already in use?
+
+We checked the source memory kind recorded by CUPTI for every H2D transfer. All three runs show the same pattern: the large weather data tensors (~165 MB each, 84 transfers per GPU) go through **pinned** memory, while roughly 2,845 smaller transfers per GPU use **pageable** memory. The NVIDIA and DSI 4-GPU distributions are byte-for-byte identical, which means both clusters are running the same DataLoader configuration and `pin_memory` is already enabled for the main data path. The smaller pageable transfers are likely internal CUDA buffers or small parameter tensors, not the weather inputs.
+
+The pinned memory recommendation is therefore already implemented and is not the cause of the performance gap.
+
+### What would fix it
+
+The root problem is that the data loading and GPU dispatch pipeline is single-threaded and sequential. The GPUs are fast enough; it is the CPU side that cannot keep up when serving four of them at once. Two approaches address this directly:
+
+**1. More DataLoader worker processes.** With `num_workers ≥ 4`, data preparation runs in separate processes that bypass the Python GIL and can genuinely prepare the next batch while the GPU is still working on the current one. The current single-worker setup is the direct cause of the 10–50 ms starvation pattern.
+
+**2. CUDA Graphs.** If inference uses fixed input shapes, capturing the forward pass as a CUDA Graph allows the entire step to be replayed with a single GPU command. This eliminates the repeated CPU-side dispatch overhead entirely and would push the GPU utilisation on DSI close to what NVIDIA achieves.
+
+The PCIe contention is a hardware topology constraint of the DSI node and cannot be fully worked around in software, but addressing the data loading bottleneck first would remove the larger problem. Once the GPU is no longer stalling on CPU dispatch, the remaining throughput gap between DSI and NVIDIA is likely small.
 
 ---
 
