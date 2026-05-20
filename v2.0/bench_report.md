@@ -271,13 +271,13 @@ Between every pair of consecutive GPU kernels there is either zero gap (the next
 | > 500 ms (I/O or barrier stalls) | 7 | 21 | 14 |
 | **Total idle time in gaps > 10 ms** | **19,821 ms** | **72,026 ms** | **24,667 ms** |
 
-The 10–50 ms bucket is the smoking gun. It goes from 41 occurrences on DSI with 1 GPU, to 423 occurrences on DSI with 4 GPUs, while NVIDIA with 4 GPUs has only 27. These are not data loading stalls (those would show up as gaps of 100 ms or more); they are the GPU going briefly idle because the Python dispatch loop cannot queue work fast enough to keep all four cards fed simultaneously.
+The 10–50 ms bucket is the main outlier going from  41 occurrences on DSI with 1 GPU, to 423 occurrences on DSI with 4 GPUs, while NVIDIA with 4 GPUs has only 27. These are weird (not really sure) and not data loading stalls (which would would show up as gaps of 100 ms or more); they are the GPU going briefly idle because the Python loop cannot queue work fast enough to keep all four cards fed simultaneously.  
 
-In plain terms: with 1 GPU the data loader and Python process can just about keep up, so the card only idles occasionally. With 4 GPUs, the same single Python process must prepare and transfer data for four cards in parallel. It cannot, so each card repeatedly waits 20–40 ms for its next batch. Multiply 423 waits by ~30 ms average and you account for most of the extra 50 seconds the DSI 4-GPU run takes compared to the NVIDIA run.
+This means that with 1 GPU the data loader and Python process can just about keep up, so the card only idles occasionally. With 4 GPUs, the same single Python process must prepare and transfer data for four cards in parallel. It cannot, so each card repeatedly waits 20–40 ms for its next batch. Multiply 423 waits by ~30 ms average and you account for most of the extra 50 seconds the DSI 4-GPU run takes compared to the NVIDIA run.
 
 ### PCIe bandwidth contention makes it worse
 
-On the NVIDIA cluster, each GPU's host-to-device transfer bandwidth is consistent whether using 1 GPU or 4 — roughly 42–45 GB/s per card. On DSI, the single-GPU bandwidth is 41.6 GB/s, but under 4-GPU load GPU0 and GPU3 drop to 31–33 GB/s. This is PCIe contention: the DSI node's four H200s appear to share fewer PCIe root complex lanes, so when all four GPUs are simultaneously pulling data from the CPU they compete with each other. The slower data transfer contributes directly to the 10–50 ms stalls above.
+On the NVIDIA cluster, each GPU's host-to-device transfer bandwidth is consistent whether using 1 GPU or 4 — roughly 42–45 GB/s per card. On DSI, the single-GPU bandwidth is 41.6 GB/s, but under 4-GPU load GPU0 and GPU3 drop to 31–33 GB/s. Some possible reasons could be PCIe contention, the DSI node's four H200s appear to share fewer PCIe root complex lanes (**googled for this answer not sure though**), so when all four GPUs are simultaneously pulling data from the CPU they compete with each other. The slower data transfer contributes directly to the 10–50 ms stalls above.
 
 | Setup | GPU0 bandwidth | GPU1 | GPU2 | GPU3 |
 |---|---|---|---|---|
@@ -287,15 +287,13 @@ On the NVIDIA cluster, each GPU's host-to-device transfer bandwidth is consisten
 
 ### NCCL is not the issue
 
-No NCCL collective kernels appeared in any of the three profiles. These are independent data-parallel inference runs — each GPU processes its own batch and there is no gradient synchronisation or inter-GPU communication at all. The interconnect speed between the H200s is irrelevant here.
+No NCCL collective kernels appeared in any of the three profiles. These are independent data-parallel inference runs — each GPU processes its own batch and there is no gradient synchronisation or inter-GPU communication at all.
 
 ### Is pinned memory already in use?
 
-We checked the source memory kind recorded by CUPTI for every H2D transfer. All three runs show the same pattern: the large weather data tensors (~165 MB each, 84 transfers per GPU) go through **pinned** memory, while roughly 2,845 smaller transfers per GPU use **pageable** memory. The NVIDIA and DSI 4-GPU distributions are byte-for-byte identical, which means both clusters are running the same DataLoader configuration and `pin_memory` is already enabled for the main data path. The smaller pageable transfers are likely internal CUDA buffers or small parameter tensors, not the weather inputs.
+Checked the source memory kind recorded by CUPTI for every H2D transfer. All three runs show the same pattern: the large weather data tensors (~165 MB each, 84 transfers per GPU) go through **pinned** memory, while roughly 2,845 smaller transfers per GPU use **pageable** memory. The NVIDIA and DSI 4-GPU distributions are byte-for-byte identical, which means both clusters are running the same DataLoader configuration and `pin_memory` is already enabled for the main data path. The smaller pageable transfers are likely internal CUDA buffers or small parameter tensors, not the weather inputs.
 
-The pinned memory recommendation is therefore already implemented and is not the cause of the performance gap.
-
-### What would fix it
+### What may? fix it
 
 The root problem is that the data loading and GPU dispatch pipeline is single-threaded and sequential. The GPUs are fast enough; it is the CPU side that cannot keep up when serving four of them at once. Two approaches address this directly:
 
@@ -303,7 +301,7 @@ The root problem is that the data loading and GPU dispatch pipeline is single-th
 
 **2. CUDA Graphs.** If inference uses fixed input shapes, capturing the forward pass as a CUDA Graph allows the entire step to be replayed with a single GPU command. This eliminates the repeated CPU-side dispatch overhead entirely and would push the GPU utilisation on DSI close to what NVIDIA achieves.
 
-The PCIe contention is a hardware topology constraint of the DSI node and cannot be fully worked around in software, but addressing the data loading bottleneck first would remove the larger problem. Once the GPU is no longer stalling on CPU dispatch, the remaining throughput gap between DSI and NVIDIA is likely small.
+The PCIe contentio?  Again unsure, a hardware topology constraint of the DSI node and cannot be fully worked around in software, but addressing the data loading bottleneck first would remove the larger problem. Once the GPU is no longer stalling on CPU dispatch, the remaining throughput gap between DSI and NVIDIA is likely small.
 
 ---
 
