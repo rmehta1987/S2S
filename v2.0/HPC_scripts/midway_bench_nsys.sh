@@ -21,7 +21,7 @@
 # Output: ${SLURM_SUBMIT_DIR}/nsys_bench_<run_num>.nsys-rep
 # To analyse on Midway after the job:
 #   nsys stats nsys_bench_<run_num>.nsys-rep
-#   nsys export --type=sqlite nsys_bench_<run_num>.nsys-rep
+#   
 #   # then scp the .sqlite to your laptop and open with nsys-ui,
 #   # or query it with sqlite3 (see bench_methodology.md for queries).
 
@@ -88,7 +88,9 @@ nsys profile \
         --yaml_config="${config_file}" \
         --run_num="${run_num}"
 
-echo "=== nsys export to sqlite ==="
-nsys export --type=sqlite --output="${NSYS_OUT}.sqlite" "${NSYS_OUT}.nsys-rep"
-echo "sqlite written: ${NSYS_OUT}.sqlite"
-echo "scp that file here and run: sqlite3 <file> (see bench_methodology.md for queries)"
+
+
+
+
+echo "Profile written: ${NSYS_OUT}.nsys-rep"
+echo "scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep"

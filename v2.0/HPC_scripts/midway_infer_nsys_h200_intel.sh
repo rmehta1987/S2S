@@ -65,6 +65,5 @@ nsys profile \
         --yaml_config="${config_file}" \
         --run_num="infer_nsys_h200_intel"
 
-echo "=== exporting to sqlite ==="
-nsys export --type=sqlite --output="${NSYS_OUT}.sqlite" "${NSYS_OUT}.nsys-rep"
-echo "sqlite written: ${NSYS_OUT}.sqlite"
+echo "Profile written: ${NSYS_OUT}.nsys-rep"
+echo "scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep"

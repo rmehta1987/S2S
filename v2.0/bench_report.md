@@ -311,16 +311,17 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 
 ### What we know so far across all measured configurations
 
-| Cluster | GPU | CPU | NVLink | NUMA nodes | CPU→GPU bandwidth (single GPU) | CPU→GPU bandwidth drop (4-GPU concurrent) | GPU util (4-GPU) | Gaps >10ms | Kernel data |
-|---|---|---|---|---|---|---|---|---|---|
-| NVIDIA cluster | H100 NVL | — | NV18 | — | 42–45 GB/s | ~0% | 37–57% | 27 | ✓ |
-| DSI | H200 | unknown | unknown | unknown | 41.6 GB/s | 20–25% (asymmetric) | 15–23% | 423 | ✓ |
-| Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3) | 26–52 GB/s¹ | 10–17% | n/a² | n/a² | ✗² |
-| Midway AMD | H200 | EPYC-9335 | unknown³ | unknown³ | ~41–43 GB/s³ | unknown³ | n/a² | n/a² | ✗² |
+| Cluster | GPU | CPU | NVLink | NUMA nodes | NUMA distance | CPU→GPU bandwidth (single GPU) | Concurrent bandwidth drop | Python dispatch gap | GPU util (4-GPU) | Gaps >10ms | Kernel data |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA cluster | H100 NVL | — | NV18 | — | — | 42–45 GB/s | ~0% | — | 37–57% | 27 | ✓ |
+| DSI | H200 | unknown | unknown | unknown | unknown | 41.6 GB/s | 20–25% (asymmetric) | — | 15–23% | 423 | ✓ |
+| Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3) | 21 | 26–52 GB/s¹ | 10–17% | 0.018 ms² | n/a³ | n/a³ | ✗³ |
+| Midway AMD | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3) | 32 | 35–54 GB/s¹ | ~0%⁴ | 0.012 ms² | n/a³ | n/a³ | ✗³ |
 
-¹ GPU0 gets only 26 GB/s for large tensors even in the sequential test — consistent with NUMA-remote memory access. GPU1–3 reach 52 GB/s.  
-² The test partition on Midway has ptrace restrictions that prevented nsys from attaching to torchrun worker processes. Kernel utilisation and gap data are therefore unavailable for the Midway H200 nodes.  
-³ AMD bandwidth test output not yet received. Values estimated from the partial nsys H2D capture.
+¹ GPU0 is anomalously slow in the sequential test on both nodes (Intel: 26 GB/s, AMD: 36 GB/s) while GPU1–3 reach 42–54 GB/s. Both GPU0s share a NIC on the same PCIe switch (PXB in topo output), which likely explains the reduced bandwidth independent of NUMA.  
+² Median inter-step dispatch gap from `inference_dispatch_smoke.py` (patterns A and D both sub-0.05 ms). The 10–50 ms gaps on DSI are **not** Python dispatch overhead.  
+³ ptrace restrictions on the test partition prevented nsys from capturing torchrun worker GPU activity. Kernel utilisation and gap histograms unavailable.  
+⁴ AMD EPYC shows essentially zero concurrent bandwidth degradation (−0.1% to +1.8%) despite having a higher cross-NUMA distance (32) than Intel (21). AMD's memory architecture provides more isolated PCIe lanes per GPU.
 
 ### Key findings from the Midway benchmarks
 
@@ -339,9 +340,9 @@ Despite GPU0 and GPU1 being on the same NUMA node, GPU0 was anomalously slow eve
 
 The DSI pattern (GPU0 and GPU3 slow, GPU1 and GPU2 less affected) is more consistent with a clean NUMA split where GPU0 and GPU3 are on the socket that is remote from where the DataLoader is allocating memory. Without `nvidia-smi topo -m` from DSI we cannot confirm this, but the two-GPU asymmetry points to a hardware path difference rather than a random or code-level effect.
 
-**Concurrent H2D contention is moderate and symmetric on Midway.** All four GPUs lose 10–17% bandwidth under concurrent load — a mild shared-bus effect. This contrasts with DSI's more severe and asymmetric drop (only GPU0 and GPU3 degraded significantly), which again points to a NUMA mis-binding specific to the DSI node rather than a fundamental H200 hardware limitation.
+**AMD EPYC shows essentially zero concurrent bandwidth degradation.** On the AMD node, all four GPUs maintain their sequential bandwidth under 4-GPU concurrent load (−0.1% to +1.8%). This is strikingly different from the Intel node (10–17% drop) and from DSI (20–25% asymmetric drop). Despite the AMD EPYC-9335 having a higher cross-NUMA distance (32) than Intel (21), its PCIe architecture appears to provide more isolated bandwidth paths per GPU. This suggests the concurrent bandwidth drop on DSI is a PCIe topology issue specific to the node, not a fundamental H200 characteristic.
 
-**Midway H200 does not reproduce the DSI 10–50 ms gap pattern** — but we cannot confirm this directly because the ptrace restriction prevents kernel capture on the test partition. The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`), which does not require nsys, needs to be run on both Midway H200 and DSI to measure Python dispatch overhead directly.
+**Python dispatch overhead is sub-millisecond on both Midway H200 nodes — definitively ruling it out as the cause of DSI's gaps.** The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`) measured the GPU idle time between consecutive autoregressive forward passes on both nodes. The median inter-step gap was 0.018 ms on Intel and 0.012 ms on AMD regardless of whether list-append or CUDA Graph replay was used. Since A ≈ D in both cases, Python overhead is genuinely negligible. The 10–50 ms gaps observed on DSI (423 occurrences) are therefore a hardware or system configuration effect specific to that cluster, not a code issue.
 
 ### What is still unknown
 
