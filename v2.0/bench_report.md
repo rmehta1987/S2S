@@ -297,7 +297,7 @@ Checked the source memory kind recorded by CUPTI for every H2D transfer. All thr
 
 The root problem is that the data loading and GPU dispatch pipeline is single-threaded and sequential. The GPUs are fast enough; it is the CPU side that cannot keep up when serving four of them at once. Two approaches address this directly:
 
-**1. More DataLoader worker processes.** With `num_workers ≥ 4`, data preparation runs in separate processes that bypass the Python GIL and can genuinely prepare the next batch while the GPU is still working on the current one. The current single-worker setup is the direct cause of the 10–50 ms starvation pattern.
+**1. More DataLoader worker processes.** Each torchrun process has its own independent DataLoader, so data loading is not serialised across GPUs. However, within each process, increasing `num_workers` allows the next batch to be prefetched in a background process while the GPU runs the current step, reducing the gap between the end of one forward pass and the start of the next data transfer.
 
 **2. CUDA Graphs.** If inference uses fixed input shapes, capturing the forward pass as a CUDA Graph allows the entire step to be replayed with a single GPU command. This eliminates the repeated CPU-side dispatch overhead entirely and would push the GPU utilisation on DSI close to what NVIDIA achieves.
 

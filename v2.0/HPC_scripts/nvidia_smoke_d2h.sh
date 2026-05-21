@@ -16,18 +16,19 @@ ulimit -l unlimited
 module load apptainer
 
 export NUM_GPUS=$(nvidia-smi -L | wc -l)
+echo "=== nvidia_smoke_d2h: $(date -Iseconds) ==="
 echo "Node: $(hostname)   GPUs available: ${NUM_GPUS}   Job: ${SLURM_JOB_ID}"
-nvidia-smi
+nvidia-smi -L
 
-export APPTAINER_DOCKER_USERNAME='$oauthtoken'
-export APPTAINER_DOCKER_PASSWORD='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'
+SIF=/project/pedramh/shared/S2S/v2.0/containers/pytorch_25.10.sif
+S2S=/project/pedramh/shared/S2S/v2.0
 
 apptainer exec \
     --nv \
     --bind /lustre/fs01 \
-    /home/ucg-aepmn/uchigaco/pytorch_25.10.sif \
+    --bind /project \
+    "${SIF}" \
     bash -c "
-        pip install ruamel.yaml -q --user 2>/dev/null;
-        PYTHONPATH=/home/ucg-aepmn/uchigaco/S2S/v2.0 \
-        python /home/ucg-aepmn/uchigaco/S2S/v2.0/test/d2h_pattern_smoke.py
+        PYTHONPATH=${S2S} \
+        python ${S2S}/test/d2h_pattern_smoke.py
     "
