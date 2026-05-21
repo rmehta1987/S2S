@@ -1,24 +1,17 @@
 #!/bin/bash -l
 #SBATCH --account=pi-pedramh
 #SBATCH --time=00:20:00
-#SBATCH -p pedramh-gpu
+#SBATCH -p test
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=32
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH -o midway_bandwidth_%N.out
-#SBATCH -e midway_bandwidth_%N.err
-
-# PCIe H2D bandwidth test — measures single-GPU and concurrent 4-GPU transfer
-# rates at the actual S2S inference tensor sizes.
-#
-# Run the same script on the DSI node (bare metal, same Python env) to get a
-# directly comparable table. The contention delta section shows whether
-# bandwidth drops under 4-GPU load, and by how much per GPU.
-#
-# Also prints nvidia-smi topo -m so the node topology is captured in the log.
+#SBATCH --nodelist=midway3-0602   # Intel Gold-6542Y, 1TB, H200 DLC
+                                   # alternatives: midway3-0603/0604/0605/0606
+#SBATCH -o bw_h200_intel_%N.out
+#SBATCH -e bw_h200_intel_%N.err
 
 ulimit -l unlimited
 
@@ -29,8 +22,8 @@ mamba activate /project/pedramh/shared/S2S/v2.0/venv
 module unload cuda
 module load cuda/12.6
 
-echo "=== midway_bandwidth_test: $(date -Iseconds) ==="
-echo "JOB_ID=${SLURM_JOB_ID}  NODELIST=${SLURM_NODELIST}"
+echo "=== bandwidth_test H200 Intel: $(date -Iseconds) ==="
+echo "JOB_ID=${SLURM_JOB_ID}  NODE=${SLURM_NODELIST}"
 nvidia-smi -L
 
 echo ""

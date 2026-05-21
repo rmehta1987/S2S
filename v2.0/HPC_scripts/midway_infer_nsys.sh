@@ -8,8 +8,8 @@
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH -o midway_infer_nsys_%x_%j.out
-#SBATCH -e midway_infer_nsys_%x_%j.err
+#SBATCH -o midway_infer_nsys_%N.out
+#SBATCH -e midway_infer_nsys_%N.err
 
 # Nsight Systems inference profile — intentionally matches the DSI collection
 # command as closely as possible so the two profiles are directly comparable:
