@@ -6,8 +6,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --nodelist=midway3-0600   # AMD EPYC-9335, 768GB, H200 DLC
-                                   # alternative: midway3-0601
+#SBATCH --nodelist=midway3-0601   # AMD EPYC-9335, 768GB, H200 DLC
+                                   # alternative: midway3-0600
 #SBATCH -o dispatch_h200_amd_%N.out
 #SBATCH -e dispatch_h200_amd_%N.err
 
