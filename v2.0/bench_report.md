@@ -326,7 +326,18 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 
 **H200 on Midway has NVLink (NV6 full mesh).** All four H200s on the Intel node are connected to each other with 6 NVLink bonds each — the same topology class as H100 NVL. This rules out PCIe-only topology as the explanation for Midway's H200 behaviour. Whether the DSI node also has NVLink is still unknown; `nvidia-smi topo -m` on the DSI node would answer this immediately.
 
-**NUMA asymmetry is real and matches the DSI pattern.** On Midway Intel H200, GPU0 gets roughly half the H2D bandwidth of GPU1–3 for large tensors even with no other GPUs transferring simultaneously. DSI showed the same asymmetry (GPU0 and GPU3 slower). Both are consistent with those GPUs pulling data from a CPU socket that is NUMA-remote from where the Python process is allocating pinned memory. The node distance penalty on Midway is measured at 2.1× (local: 10, remote: 21).
+**Asymmetric H2D bandwidth appears on both Midway and DSI, suggesting a topology pattern rather than a DSI-specific fault.** On Midway Intel H200, GPU0 gets roughly half the H2D bandwidth of GPU1–3 for large tensors even in the sequential test where only one GPU is active at a time (no contention possible). DSI showed a different but related asymmetry — GPU0 and GPU3 dropped to 31–33 GB/s under concurrent load while GPU1 and GPU2 stayed near 38 GB/s.
+
+To understand why, it helps to know what NUMA means in this context. A dual-socket server has two CPU chips, each with its own pool of local RAM. A GPU copies data from CPU RAM across the PCIe bus. If the GPU is on the "near" CPU socket — the one that owns the RAM being read — the transfer is fast. If it is on the "far" socket, the data first has to cross an inter-socket link (Intel's UPI) before reaching PCIe, which adds latency and reduces bandwidth. This penalty is the NUMA effect.
+
+On Midway the topology output (`nvidia-smi topo -m`) confirmed:
+- GPU0 and GPU1 are on NUMA node 0 (CPUs 0–23)
+- GPU2 and GPU3 are on NUMA node 1 (CPUs 24–47)
+- Cross-socket distance is 2.1× worse than local (distance 21 vs 10)
+
+Despite GPU0 and GPU1 being on the same NUMA node, GPU0 was anomalously slow even in isolation — half the bandwidth of GPU1. This does not fit a simple two-socket NUMA explanation and may instead reflect a PCIe switch topology difference at the slot level (GPU0 could be on a PCIe switch that also hosts a NIC, competing for the same upstream lanes). The bandwidth test alone cannot distinguish these causes; `lspci -tv` or a PCIe topology diagram of the server would.
+
+The DSI pattern (GPU0 and GPU3 slow, GPU1 and GPU2 less affected) is more consistent with a clean NUMA split where GPU0 and GPU3 are on the socket that is remote from where the DataLoader is allocating memory. Without `nvidia-smi topo -m` from DSI we cannot confirm this, but the two-GPU asymmetry points to a hardware path difference rather than a random or code-level effect.
 
 **Concurrent H2D contention is moderate and symmetric on Midway.** All four GPUs lose 10–17% bandwidth under concurrent load — a mild shared-bus effect. This contrasts with DSI's more severe and asymmetric drop (only GPU0 and GPU3 degraded significantly), which again points to a NUMA mis-binding specific to the DSI node rather than a fundamental H200 hardware limitation.
 
