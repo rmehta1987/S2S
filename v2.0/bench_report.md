@@ -305,6 +305,46 @@ The PCIe contentio?  Again unsure, a hardware topology constraint of the DSI nod
 
 ---
 
+## Midway cluster GPU comparison
+
+To understand whether the DSI performance issues are DSI-specific or reflect the H200 hardware in general, we ran the bandwidth test (`v2.0/test/bandwidth_test.py`) and collected nsys inference profiles on H200 nodes in Midway's test partition. Two node types were tested: Intel Gold-6542Y (midway3-0602) and AMD EPYC-9335 (midway3-0601).
+
+### What we know so far across all measured configurations
+
+| Cluster | GPU | CPU | NVLink | NUMA nodes | H2D single-GPU | H2D concurrent drop | GPU util (4-GPU) | Gaps >10ms | Kernel data |
+|---|---|---|---|---|---|---|---|---|---|
+| NVIDIA cluster | H100 NVL | — | NV18 | — | 42–45 GB/s | ~0% | 37–57% | 27 | ✓ |
+| DSI | H200 | unknown | unknown | unknown | 41.6 GB/s | 20–25% (asymmetric) | 15–23% | 423 | ✓ |
+| Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3) | 26–52 GB/s¹ | 10–17% | n/a² | n/a² | ✗² |
+| Midway AMD | H200 | EPYC-9335 | unknown³ | unknown³ | ~41–43 GB/s³ | unknown³ | n/a² | n/a² | ✗² |
+
+¹ GPU0 gets only 26 GB/s for large tensors even in the sequential test — consistent with NUMA-remote memory access. GPU1–3 reach 52 GB/s.  
+² The test partition on Midway has ptrace restrictions that prevented nsys from attaching to torchrun worker processes. Kernel utilisation and gap data are therefore unavailable for the Midway H200 nodes.  
+³ AMD bandwidth test output not yet received. Values estimated from the partial nsys H2D capture.
+
+### Key findings from the Midway benchmarks
+
+**H200 on Midway has NVLink (NV6 full mesh).** All four H200s on the Intel node are connected to each other with 6 NVLink bonds each — the same topology class as H100 NVL. This rules out PCIe-only topology as the explanation for Midway's H200 behaviour. Whether the DSI node also has NVLink is still unknown; `nvidia-smi topo -m` on the DSI node would answer this immediately.
+
+**NUMA asymmetry is real and matches the DSI pattern.** On Midway Intel H200, GPU0 gets roughly half the H2D bandwidth of GPU1–3 for large tensors even with no other GPUs transferring simultaneously. DSI showed the same asymmetry (GPU0 and GPU3 slower). Both are consistent with those GPUs pulling data from a CPU socket that is NUMA-remote from where the Python process is allocating pinned memory. The node distance penalty on Midway is measured at 2.1× (local: 10, remote: 21).
+
+**Concurrent H2D contention is moderate and symmetric on Midway.** All four GPUs lose 10–17% bandwidth under concurrent load — a mild shared-bus effect. This contrasts with DSI's more severe and asymmetric drop (only GPU0 and GPU3 degraded significantly), which again points to a NUMA mis-binding specific to the DSI node rather than a fundamental H200 hardware limitation.
+
+**Midway H200 does not reproduce the DSI 10–50 ms gap pattern** — but we cannot confirm this directly because the ptrace restriction prevents kernel capture on the test partition. The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`), which does not require nsys, needs to be run on both Midway H200 and DSI to measure Python dispatch overhead directly.
+
+### What is still unknown
+
+The critical missing piece is DSI's hardware topology. Running two commands on the DSI node would resolve the main open questions:
+
+```bash
+nvidia-smi topo -m     # shows NVLink vs PCIe, GPU-to-NUMA mapping
+numactl --hardware     # shows NUMA node count and distances
+```
+
+If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6`, that is the primary structural difference. If DSI also shows `NV6`, the topology is similar and the 10–50 ms gaps are more likely attributable to NUMA mis-binding, CPU dispatch latency, or a different PyTorch/CUDA version.
+
+---
+
 ## Notes on measurement reliability
 
 - All step times are measured with graphics card synchronisation barriers (`torch.cuda.synchronize()`) on both sides of the timing window. This ensures we record actual execution time, not just how long it takes to submit work to the graphics card.

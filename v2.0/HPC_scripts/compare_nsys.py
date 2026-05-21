@@ -25,6 +25,11 @@ import sys
 from pathlib import Path
 
 
+def _table_exists(cur, name: str) -> bool:
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,))
+    return cur.fetchone() is not None
+
+
 # ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
@@ -66,6 +71,11 @@ def gpu_utilization(cur, label):
     kernel launches, waiting for either CPU dispatch, inter-GPU barriers, or data.
     """
     section(f"Per-GPU Utilization — {label}")
+    if not _table_exists(cur, "CUPTI_ACTIVITY_KIND_KERNEL"):
+        print("  CUPTI_ACTIVITY_KIND_KERNEL not found — GPU kernel activity was not captured.")
+        print("  Likely cause: ptrace restrictions on this partition prevented nsys from")
+        print("  attaching to torchrun worker processes. Try cuda/12.9 + --target-processes=all.")
+        return
     cur.execute("""
         SELECT deviceId,
                COUNT(*)                        AS launches,
@@ -141,6 +151,9 @@ def nccl_kernels(cur, label):
     kernel avg to see whether comms dominate.
     """
     section(f"NCCL Collective Kernels — {label}")
+    if not _table_exists(cur, "CUPTI_ACTIVITY_KIND_KERNEL"):
+        print("  Kernel table not available — skipped.")
+        return
     cur.execute("""
         SELECT s.value,
                COUNT(*),
@@ -212,6 +225,9 @@ def idle_gap_distribution(cur, label):
     the GPU's idle time is explained by these stalls.
     """
     section(f"GPU0 Inter-Kernel Idle Gaps — {label}")
+    if not _table_exists(cur, "CUPTI_ACTIVITY_KIND_KERNEL"):
+        print("  Kernel table not available — skipped.")
+        return
     cur.execute("""
         SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL
         WHERE deviceId=0
