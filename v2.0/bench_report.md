@@ -311,7 +311,7 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 
 ### What we know so far across all measured configurations
 
-| Cluster | GPU | CPU | NVLink | NUMA nodes | H2D single-GPU | H2D concurrent drop | GPU util (4-GPU) | Gaps >10ms | Kernel data |
+| Cluster | GPU | CPU | NVLink | NUMA nodes | CPU→GPU bandwidth (single GPU) | CPU→GPU bandwidth drop (4-GPU concurrent) | GPU util (4-GPU) | Gaps >10ms | Kernel data |
 |---|---|---|---|---|---|---|---|---|---|
 | NVIDIA cluster | H100 NVL | — | NV18 | — | 42–45 GB/s | ~0% | 37–57% | 27 | ✓ |
 | DSI | H200 | unknown | unknown | unknown | 41.6 GB/s | 20–25% (asymmetric) | 15–23% | 423 | ✓ |
