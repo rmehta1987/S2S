@@ -84,24 +84,45 @@ class SyntheticForward(nn.Module):
     Approximate the PanguModel forward pass compute without its architecture.
 
     The real forward pass takes ~14 ms on an H100 at batch=1. This module
-    hits roughly the same wall time by running a sequence of matmuls and
-    layer norms at the same tensor sizes. The goal is not to replicate Pangu
-    but to produce a GPU kernel sequence of similar duration so that the
-    inter-step dispatch gap is measured in the right context.
+    produces a GPU kernel sequence of similar duration using Conv2d layers
+    operating on the actual spatial dimensions (128×256).
+
+    The previous version used nn.Linear on the fully flattened tensors
+    (e.g. nn.Linear(3_407_872, 512) for upper-air), which created ~7 GB
+    weight matrices and caused OOM. Conv2d operates channel-wise and has
+    negligible parameter memory: Conv2d(128, 128, 3) weights are only ~590 KB.
+
+    The goal is not to replicate Pangu but to produce enough GPU work that
+    the inter-step dispatch gap is measurable relative to real compute time.
+    hidden=128 channels over a 128×256 spatial map gives ~5–15 ms per forward
+    pass on H100/H200, which is the right order of magnitude.
     """
 
-    def __init__(self, hidden: int = 512):
+    def __init__(self, hidden: int = 128):
         super().__init__()
-        surf_flat  = 16 * 128 * 256    # surface channels × spatial
-        upper_flat = 104 * 128 * 256   # upper-air channels × spatial
+        surf_c  = SURFACE_SHAPE[1]    # 16
+        upper_c = UPPER_AIR_SHAPE[1]  # 104
 
-        # A few projection layers to produce ~14 ms of GPU work
-        self.surf_proj  = nn.Linear(surf_flat,  hidden, bias=False)
-        self.upper_proj = nn.Linear(upper_flat, hidden, bias=False)
-        self.mixer      = nn.Linear(hidden, hidden, bias=False)
-        self.norm       = nn.LayerNorm(hidden)
-        self.surf_out   = nn.Linear(hidden, surf_flat,  bias=False)
-        self.upper_out  = nn.Linear(hidden, upper_flat, bias=False)
+        # Surface branch: 16 → hidden → hidden → 16
+        self.surf_net = nn.Sequential(
+            nn.Conv2d(surf_c,  hidden, 3, padding=1, bias=False),
+            nn.GELU(),
+            nn.Conv2d(hidden,  hidden, 3, padding=1, bias=False),
+            nn.GELU(),
+            nn.Conv2d(hidden,  hidden, 3, padding=1, bias=False),
+            nn.GELU(),
+            nn.Conv2d(hidden,  surf_c, 3, padding=1, bias=False),
+        )
+        # Upper-air branch: 104 → hidden → hidden → 104
+        self.upper_net = nn.Sequential(
+            nn.Conv2d(upper_c, hidden, 3, padding=1, bias=False),
+            nn.GELU(),
+            nn.Conv2d(hidden,  hidden, 3, padding=1, bias=False),
+            nn.GELU(),
+            nn.Conv2d(hidden,  hidden, 3, padding=1, bias=False),
+            nn.GELU(),
+            nn.Conv2d(hidden,  upper_c, 3, padding=1, bias=False),
+        )
 
     def forward(self, surface: torch.Tensor,
                 upper_air: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -109,13 +130,7 @@ class SyntheticForward(nn.Module):
         Takes surface and upper-air tensors, returns updated versions.
         The autoregressive loop feeds each output back as the next input.
         """
-        B = surface.shape[0]
-        s = self.surf_proj(surface.view(B, -1))
-        u = self.upper_proj(upper_air.view(B, -1))
-        h = self.norm(self.mixer(s + u))
-        out_s = self.surf_out(h).view_as(surface)
-        out_u = self.upper_out(h).view_as(upper_air)
-        return out_s, out_u
+        return self.surf_net(surface), self.upper_net(upper_air)
 
 
 # ---------------------------------------------------------------------------
