@@ -54,6 +54,7 @@ nsys profile \
     -t cuda,nvtx,cudnn \
     -o "${NSYS_OUT}" \
     --force-overwrite=true \
+    --trace-fork-before-exec=true \
     torchrun \
         --standalone \
         --nproc_per_node="${NUM_GPUS}" \
