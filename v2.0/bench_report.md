@@ -375,6 +375,18 @@ If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6
 
 ---
 
+## Summary of DSI investigation as of 2026-05-21
+
+**The core problem.** The DSI cluster's H200 GPUs spend most of their time sitting idle rather than running the model. The actual forecast computation takes about the same time on DSI as on the NVIDIA cluster — the H200 is not slower at the work itself — but the GPUs keep stopping and waiting for 10–50 ms between each step of the forecast loop, hundreds of times per run. The NVIDIA cluster barely does this at all.
+
+**What we ruled out.** Both clusters ran the exact same code. A timing test on Midway's H200 machines showed that the gaps between steps in the Python loop are under a tenth of a millisecond — so the pauses on DSI are not coming from the software, they are coming from something about the machine itself. We also confirmed that adding more data loading workers would not help, because the data loading pipeline is not serialised across the four GPUs — each GPU already has its own independent loader.
+
+**What the Midway tests told us.** Midway has two types of H200 nodes — Intel CPU and AMD CPU. Both have direct high-speed connections between the four GPUs. The Intel node shows a ~3% slowdown when all four GPUs load data at the same time; the AMD node shows essentially no slowdown. Neither node reproduces the severe pauses seen on DSI, which suggests the DSI machine has a specific hardware configuration issue rather than a general H200 problem. We also corrected an earlier finding: a test using wrong data sizes made it look like one Intel GPU had a hardware fault. With the correct sizes, all four Intel GPUs perform identically — the anomaly was a measurement artifact.
+
+**What we still do not know.** We have never seen the DSI machine's hardware wiring diagram — which GPUs are connected to which CPU socket, whether there is high-speed GPU-to-GPU interconnect, and how the operating system assigns work to CPU cores. Two commands run on the DSI machine would answer most of these questions in seconds (`nvidia-smi topo -m` and `numactl --hardware`). We also do not yet have a full hardware timeline from Midway's standard H100 partition, which would give the cleanest direct comparison against DSI.
+
+---
+
 ## Notes on measurement reliability
 
 - All step times are measured with graphics card synchronisation barriers (`torch.cuda.synchronize()`) on both sides of the timing window. This ensures we record actual execution time, not just how long it takes to submit work to the graphics card.
