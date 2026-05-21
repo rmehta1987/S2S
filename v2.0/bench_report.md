@@ -271,9 +271,9 @@ Between every pair of consecutive GPU kernels there is either zero gap (the next
 | > 500 ms (I/O or barrier stalls) | 7 | 21 | 14 |
 | **Total idle time in gaps > 10 ms** | **19,821 ms** | **72,026 ms** | **24,667 ms** |
 
-The 10–50 ms bucket is the main outlier going from  41 occurrences on DSI with 1 GPU, to 423 occurrences on DSI with 4 GPUs, while NVIDIA with 4 GPUs has only 27. These are weird (not really sure) and not data loading stalls (which would would show up as gaps of 100 ms or more); they are the GPU going briefly idle because the Python loop cannot queue work fast enough to keep all four cards fed simultaneously.  
+The 10–50 ms bucket is the main outlier going from  41 occurrences on DSI with 1 GPU, to 423 occurrences on DSI with 4 GPUs, while NVIDIA with 4 GPUs has only 27. These are weird (not really sure) and not data loading stalls (which would would show up as gaps of 100 ms or more); they are the GPU going briefly idle waiting for the CPU to signal the next kernel launch.
 
-This means that with 1 GPU the data loader and Python process can just about keep up, so the card only idles occasionally. With 4 GPUs, the same single Python process must prepare and transfer data for four cards in parallel. It cannot, so each card repeatedly waits 20–40 ms for its next batch. Multiply 423 waits by ~30 ms average and you account for most of the extra 50 seconds the DSI 4-GPU run takes compared to the NVIDIA run.
+torchrun spawns 4 independent Python processes — one per GPU — so there is no single shared bottleneck across ranks. The cause of the stalls is therefore within each individual rank: something about the DSI cluster's CPU-to-GPU dispatch path adds 10–50 ms between consecutive kernel groups. The measured cumulative idle time across all gaps >10 ms is 72,026 ms on DSI 4-GPU vs 24,667 ms on NVIDIA — a difference of ~47 s — which accounts for most of the wall-time gap shown in the table above.
 
 ### PCIe bandwidth contention makes it worse
 
@@ -295,13 +295,13 @@ Checked the source memory kind recorded by CUPTI for every H2D transfer. All thr
 
 ### What may? fix it
 
-The root problem is that the data loading and GPU dispatch pipeline is single-threaded and sequential. The GPUs are fast enough; it is the CPU side that cannot keep up when serving four of them at once. Two approaches address this directly:
+The dispatch smoke test (see Midway cluster section below) measured sub-millisecond inter-step dispatch gaps on both Midway H200 nodes, which means Python overhead alone is not the bottleneck — the stalls are more likely a hardware topology or system configuration effect on DSI specifically. With that in mind:
 
-**1. More DataLoader worker processes.** Each torchrun process has its own independent DataLoader, so data loading is not serialised across GPUs. However, within each process, increasing `num_workers` allows the next batch to be prefetched in a background process while the GPU runs the current step, reducing the gap between the end of one forward pass and the start of the next data transfer.
+**1. DataLoader prefetching.** Each torchrun rank already has `num_data_workers: 8` set in the config. The next step would be to confirm that `prefetch_factor` is set and that data is being pipelined onto the GPU asynchronously with `non_blocking=True`, so the next batch transfer overlaps with the current forward pass rather than starting after it.
 
-**2. CUDA Graphs.** If inference uses fixed input shapes, capturing the forward pass as a CUDA Graph allows the entire step to be replayed with a single GPU command. This eliminates the repeated CPU-side dispatch overhead entirely and would push the GPU utilisation on DSI close to what NVIDIA achieves.
+**2. NUMA binding.** If the DSI cluster has a multi-socket layout with GPUs split across NUMA nodes, binding each torchrun process to the CPU cores and memory local to its GPU would eliminate cross-socket dispatch latency. Running `nvidia-smi topo -m` and `numactl --hardware` on DSI would confirm whether this is the case (see hardware topology section below).
 
-The PCIe contentio?  Again unsure, a hardware topology constraint of the DSI node and cannot be fully worked around in software, but addressing the data loading bottleneck first would remove the larger problem. Once the GPU is no longer stalling on CPU dispatch, the remaining throughput gap between DSI and NVIDIA is likely small.
+The PCIe contentio?  Again unsure, a hardware topology constraint of the DSI node and cannot be fully worked around in software without knowing the actual node topology first.
 
 ---
 
@@ -313,15 +313,18 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 
 | Cluster | GPU | CPU | NVLink | NUMA nodes | NUMA distance | CPU→GPU bandwidth (single GPU) | Concurrent bandwidth drop | Python dispatch gap | GPU util (4-GPU) | Gaps >10ms | Kernel data |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| NVIDIA cluster | H100 NVL | — | NV18 | — | — | 42–45 GB/s | ~0% | — | 37–57% | 27 | ✓ |
-| DSI | H200 | unknown | unknown | unknown | unknown | 41.6 GB/s | 20–25% (asymmetric) | — | 15–23% | 423 | ✓ |
-| Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3) | 21 | 26–52 GB/s¹ | 10–17% | 0.018 ms² | n/a³ | n/a³ | ✗³ |
-| Midway AMD | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3) | 32 | 35–54 GB/s¹ | ~0%⁴ | 0.012 ms² | n/a³ | n/a³ | ✗³ |
+| NVIDIA cluster | H100 NVL | — | unknown¹ | — | — | 42–45 GB/s² | ~0%² | — | 37–57% | 27 | ✓ |
+| DSI | H200 | unknown | unknown | unknown | unknown | 41.6 GB/s² | 20–25% (asymmetric)² | — | 15–23% | 423 | ✓ |
+| Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 21 | 26–52 GB/s³ | 10–17% | 0.018 ms⁴ | n/a⁵ | n/a⁵ | ✗⁵ |
+| Midway AMD | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 32 | 35–54 GB/s³ | ~0%⁶ | 0.012 ms⁴ | n/a⁵ | n/a⁵ | ✗⁵ |
 
-¹ GPU0 is anomalously slow in the sequential test on both nodes (Intel: 26 GB/s, AMD: 36 GB/s) while GPU1–3 reach 42–54 GB/s. Both GPU0s share a NIC on the same PCIe switch (PXB in topo output), which likely explains the reduced bandwidth independent of NUMA.  
-² Median inter-step dispatch gap from `inference_dispatch_smoke.py` (patterns A and D both sub-0.05 ms). The 10–50 ms gaps on DSI are **not** Python dispatch overhead.  
-³ ptrace restrictions on the test partition prevented nsys from capturing torchrun worker GPU activity. Kernel utilisation and gap histograms unavailable.  
-⁴ AMD EPYC shows essentially zero concurrent bandwidth degradation (−0.1% to +1.8%) despite having a higher cross-NUMA distance (32) than Intel (21). AMD's memory architecture provides more isolated PCIe lanes per GPU.
+¹ `nvidia-smi topo -m` was never captured for the NVIDIA cluster so the NVLink configuration is unknown. H100 NVL typically shows NV6 between paired GPUs but this was not verified.  
+² NVIDIA bandwidth figures come from the nsys profile (actual inference transfers, ~165 MB tensors). Midway bandwidth figures come from `bandwidth_test.py` (synthetic tensors, max 13.6 MB upper_air). These measure different transfer sizes and are not directly comparable in absolute GB/s — the relative contention delta is the meaningful comparison.  
+³ GPU0 is anomalously slow in the sequential test on both Midway nodes. Intel GPU0 upper_air: 26.7 GB/s vs GPU1–3 at 52 GB/s. AMD GPU0 upper_air: 43.0 GB/s vs GPU2/3 at 54 GB/s (different tensor; AMD AGGREGATE shows GPU0=35.9 GB/s). The GPU0–NIC0 PXB link is present on both nodes but GPU1 also shares a PXB with NIC1 yet is fast, so this is not a complete explanation.  
+⁴ Median inter-step dispatch gap from `inference_dispatch_smoke.py` on one GPU, synthetic 87 ms/step workload (6× heavier than real PanguModel). Pattern D (CUDA Graph) was 2.5–3× *slower* than pattern A (list-append): Intel 0.046 vs 0.018 ms, AMD 0.037 vs 0.012 ms. The conclusion is that both are far below 10 ms — not that A ≈ D — so Python dispatch is unlikely to explain 10–50 ms DSI gaps, though the test does not reproduce 4-GPU DDP conditions on DSI.  
+⁵ ptrace restrictions on the test partition prevented nsys from capturing torchrun worker GPU activity. Kernel utilisation and gap histograms unavailable.  
+⁷ The `nvidia-smi topo -m` CPU Affinity column suggests GPU0/1 are on the same socket as CPUs 0–23/0–31 and GPU2/3 on CPUs 24–47/32–63. However, the `GPU NUMA ID` column reads `N/A` on both nodes, meaning the GPU-to-NUMA mapping was not confirmed by the hardware at time of profiling.  
+⁶ AMD EPYC shows ~0% concurrent bandwidth change in the AGGREGATE median. For the largest individual tensor (upper_air, 81.8 MB), concurrent bandwidth was actually higher than sequential on some GPUs — consistent with measurement noise rather than a clean architectural conclusion. The "zero contention" claim holds for the aggregate metric but should not be over-interpreted.
 
 ### Key findings from the Midway benchmarks
 
@@ -331,10 +334,11 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 
 To understand why, it helps to know what NUMA means in this context. A dual-socket server has two CPU chips, each with its own pool of local RAM. A GPU copies data from CPU RAM across the PCIe bus. If the GPU is on the "near" CPU socket — the one that owns the RAM being read — the transfer is fast. If it is on the "far" socket, the data first has to cross an inter-socket link (Intel's UPI) before reaching PCIe, which adds latency and reduces bandwidth. This penalty is the NUMA effect.
 
-On Midway the topology output (`nvidia-smi topo -m`) confirmed:
-- GPU0 and GPU1 are on NUMA node 0 (CPUs 0–23)
-- GPU2 and GPU3 are on NUMA node 1 (CPUs 24–47)
-- Cross-socket distance is 2.1× worse than local (distance 21 vs 10)
+On Midway the topology output (`nvidia-smi topo -m`) showed:
+- GPU0 and GPU1 have CPU affinity 0–23 (Intel) / 0–31 (AMD), suggesting NUMA node 0
+- GPU2 and GPU3 have CPU affinity 24–47 (Intel) / 32–63 (AMD), suggesting NUMA node 1
+- Cross-socket distance is 2.1× worse than local on Intel (21 vs 10) and 3.2× on AMD (32 vs 10)
+- Note: the `GPU NUMA ID` field was `N/A` on both nodes, so the GPU-side NUMA assignment was not directly confirmed by the hardware report
 
 Despite GPU0 and GPU1 being on the same NUMA node, GPU0 was anomalously slow even in isolation — half the bandwidth of GPU1. This does not fit a simple two-socket NUMA explanation and may instead reflect a PCIe switch topology difference at the slot level (GPU0 could be on a PCIe switch that also hosts a NIC, competing for the same upstream lanes). The bandwidth test alone cannot distinguish these causes; `lspci -tv` or a PCIe topology diagram of the server would.
 
@@ -342,7 +346,7 @@ The DSI pattern (GPU0 and GPU3 slow, GPU1 and GPU2 less affected) is more consis
 
 **AMD EPYC shows essentially zero concurrent bandwidth degradation.** On the AMD node, all four GPUs maintain their sequential bandwidth under 4-GPU concurrent load (−0.1% to +1.8%). This is strikingly different from the Intel node (10–17% drop) and from DSI (20–25% asymmetric drop). Despite the AMD EPYC-9335 having a higher cross-NUMA distance (32) than Intel (21), its PCIe architecture appears to provide more isolated bandwidth paths per GPU. This suggests the concurrent bandwidth drop on DSI is a PCIe topology issue specific to the node, not a fundamental H200 characteristic.
 
-**Python dispatch overhead is sub-millisecond on both Midway H200 nodes — definitively ruling it out as the cause of DSI's gaps.** The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`) measured the GPU idle time between consecutive autoregressive forward passes on both nodes. The median inter-step gap was 0.018 ms on Intel and 0.012 ms on AMD regardless of whether list-append or CUDA Graph replay was used. Since A ≈ D in both cases, Python overhead is genuinely negligible. The 10–50 ms gaps observed on DSI (423 occurrences) are therefore a hardware or system configuration effect specific to that cluster, not a code issue.
+**Python dispatch overhead is sub-millisecond on both Midway H200 nodes, making it an unlikely cause of DSI's gaps.** The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`) measured the GPU idle time between consecutive autoregressive forward passes on both nodes using a synthetic model. The median inter-step gap was 0.018 ms on Intel and 0.012 ms on AMD. Pattern D (CUDA Graph replay) was 2.5–3× *slower* than pattern A (list-append) — 0.046 vs 0.018 ms Intel, 0.037 vs 0.012 ms AMD — because CUDA Graph replay still requires copying new inputs into the graph's fixed buffers before each replay. The relevant conclusion is that both patterns produce gaps far below 10 ms, meaning Python-level dispatch overhead does not explain 10–50 ms stalls. Two caveats apply: the test ran on a single GPU with a synthetic 87 ms/step workload (6× heavier than real Pangu), and did not reproduce 4-GPU DDP conditions. It is therefore evidence against Python dispatch as the primary cause but not a definitive ruling.
 
 ### What is still unknown
 
@@ -353,7 +357,7 @@ nvidia-smi topo -m     # shows NVLink vs PCIe, GPU-to-NUMA mapping
 numactl --hardware     # shows NUMA node count and distances
 ```
 
-If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6`, that is the primary structural difference. If DSI also shows `NV6`, the topology is similar and the 10–50 ms gaps are more likely attributable to NUMA mis-binding, CPU dispatch latency, or a different PyTorch/CUDA version.
+If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6`, that is the primary structural difference. If DSI also shows `NV6`, the topology is similar and the 10–50 ms gaps are more likely attributable to NUMA mis-binding or a different PyTorch/CUDA version — both of which affect how quickly the kernel launch signal reaches the GPU command processor without being about Python overhead per se.
 
 ---
 
