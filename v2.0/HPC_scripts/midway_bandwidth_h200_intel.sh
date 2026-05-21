@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --account=pi-pedramh
+#SBATCH --account=rcc-staff
 #SBATCH --time=00:20:00
 #SBATCH -p test
 #SBATCH --nodes=1
