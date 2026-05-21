@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PCIe host-to-device (H2D) bandwidth test for multi-GPU nodes.
+PCIe host-to-device (H2D) and device-to-host (D2H) bandwidth test for multi-GPU nodes.
 
 Background
 ----------
@@ -21,7 +21,7 @@ than the others in a concurrent test.
 What this script measures
 --------------------------
 1. Sequential bandwidth  — each GPU is tested one at a time, with all others
-   idle. This is the best-case H2D rate and is not affected by contention.
+   idle. This is the best-case rate and is not affected by contention.
    It gives the per-GPU baseline.
 
 2. Concurrent bandwidth  — all GPUs transfer simultaneously, each in its own
@@ -36,19 +36,28 @@ What this script measures
 
 Why pinned memory
 -----------------
-The test allocates the source tensor in pinned (page-locked) CPU memory, which
-is what PyTorch's DataLoader does when pin_memory=True. Pinned memory lets the
-PCIe DMA engine transfer directly from CPU DRAM without staging through a
-bounce buffer, so it gives the highest attainable H2D rate. Using pageable
-memory instead would measure a different (slower) path and would not match
-what the inference code actually does.
+The test allocates memory in pinned (page-locked) CPU memory, which is what
+PyTorch's DataLoader does when pin_memory=True. Pinned memory lets the PCIe
+DMA engine transfer directly without staging through a bounce buffer, giving
+the highest attainable rate.
 
 Tensor sizes
 ------------
-SHAPES matches the actual surface, upper-air, and diagnostic tensors in the
-S2S inference loop. These are the same sizes recorded by CUPTI in the nsys
-profiles and used in d2h_pattern_smoke.py, so the bandwidth numbers here are
-directly comparable to the H2D section of compare_nsys.py.
+Derived from exp2.yaml (the default training/inference config):
+  - 5 surface variables, 5 upper-air variables × 17 pressure levels = 85 channels
+  - 2 diagnostic variables, 1 varying boundary variable
+  - batch_size = 8 global / 4 GPUs = 2 per GPU
+  - timedelta_hours = 24 → inference_steps = 15 (15-day forecast at 24h resolution)
+
+Two groups of shapes are tested:
+
+  H2D_SHAPES — tensors that move from the DataLoader (CPU) onto the GPU each
+  inference step. These are the per-step inputs and are relatively small.
+
+  D2H_SHAPES — tensors that move back from the GPU to CPU after all inference
+  steps complete. These are the stacked multi-step output tensors and are much
+  larger. The largest (stacked upper-air output) is ~178 MB, matching the
+  ~165 MB per-transfer figure measured from the DSI nsys profile.
 
 Usage
 -----
@@ -59,9 +68,8 @@ To isolate NUMA effects, run twice with numactl and compare:
     numactl --cpunodebind=0 --membind=0 python bandwidth_test.py
     numactl --cpunodebind=1 --membind=1 python bandwidth_test.py
 
-A significant difference between the two runs means the GPU processes are
-sensitive to which NUMA node their CPU thread runs on — confirming the NUMA
-hypothesis for the DSI cluster's asymmetric bandwidth degradation.
+A significant difference between the two runs means GPU processes are
+sensitive to which NUMA node their CPU thread runs on.
 """
 
 import time
@@ -71,17 +79,42 @@ import torch.multiprocessing as mp
 from typing import List
 
 # ---------------------------------------------------------------------------
-# Tensor shapes
+# Tensor shapes — derived from v2.0/config/exp2.yaml
 # ---------------------------------------------------------------------------
 
-# These match SURF_SHAPE / UPPER_SHAPE / DIAG_SHAPE in d2h_pattern_smoke.py
-# and the actual transfer sizes measured from the nsys CUPTI records.
-# Changing these shapes would make the bandwidth numbers incomparable to
-# the nsys profile analysis in compare_nsys.py.
-SHAPES = {
-    "surface":    (1, 16,  128, 256),   # ~12.5 MB — 2D atmospheric fields
-    "upper_air":  (1, 104, 128, 256),   # ~81.8 MB — pressure level fields (largest tensor)
-    "diagnostic": (1, 4,   128, 256),   #  ~3.1 MB — derived diagnostic variables
+# exp2.yaml config values that determine these shapes:
+#   surface_variables: 5 variables
+#   upper_air_variables: 5 vars × 17 pressure levels = 85 channels
+#   diagnostic_variables: 2 variables
+#   varying_boundary_variables: 1 variable
+#   batch_size: 8 global / 4 GPUs = 2 per GPU (BATCH_PER_GPU)
+#   timedelta_hours: 24  →  inference_steps = (24*15)//24 = 15
+
+BATCH_PER_GPU   = 2    # 8 global / 4 GPUs
+SURF_CHANNELS   = 5    # surface_variables count
+UPPER_CHANNELS  = 85   # 5 upper_air_variables × 17 pressure levels
+DIAG_CHANNELS   = 2    # diagnostic_variables count
+VBND_CHANNELS   = 1    # varying_boundary_variables count
+INFERENCE_STEPS = 15   # (24 × 15 days) // timedelta_hours=24
+H, W            = 128, 256
+
+# H2D shapes: per-step DataLoader output transferred to GPU each inference step.
+# These are relatively small — the DataLoader moves one batch of inputs at a time.
+H2D_SHAPES = {
+    "surf_input":       (BATCH_PER_GPU, SURF_CHANNELS,  H, W),            #  1.3 MB
+    "upper_air_input":  (BATCH_PER_GPU, UPPER_CHANNELS, H, W),            # 22.3 MB
+    "varying_boundary": (BATCH_PER_GPU, INFERENCE_STEPS, VBND_CHANNELS, H, W),  #  3.9 MB
+}
+
+# D2H shapes: stacked multi-step outputs moved back to CPU after all inference
+# steps complete. Much larger because all time steps are stacked together before
+# the transfer. The upper-air stacked output at ~178 MB matches the ~165 MB
+# per-transfer figure measured from the DSI H200 nsys profile.
+T = INFERENCE_STEPS + 1   # initial state + 15 forecast steps = 16 time points
+D2H_SHAPES = {
+    "surf_output_stacked":  (BATCH_PER_GPU * T, SURF_CHANNELS,  H, W),  #  10.5 MB
+    "upper_output_stacked": (BATCH_PER_GPU * T, UPPER_CHANNELS, H, W),  # 177.9 MB ← large
+    "diag_output_stacked":  (BATCH_PER_GPU * T, DIAG_CHANNELS,  H, W),  #   4.2 MB
 }
 
 NREPS  = 50   # number of timed transfers per shape after warmup
@@ -100,52 +133,39 @@ def _mb(shape: tuple) -> float:
     return n * 4 / 1e6
 
 
-def measure_h2d(device_id: int, shape: tuple, nreps: int, warmup: int) -> List[float]:
+def _measure(device_id: int, shape: tuple, nreps: int, warmup: int,
+             direction: str = "h2d") -> List[float]:
     """
-    Measure H2D transfer bandwidth for a single GPU.
+    Measure PCIe transfer bandwidth for a single GPU in one direction.
 
-    Allocates a pinned CPU tensor (src) and an empty GPU tensor (dst) of the
-    given shape. Repeatedly copies src → dst using a synchronous blocking copy
-    so the wall-clock time between the two synchronize() calls is the true
-    transfer time, not just the time to enqueue the DMA command.
+    direction='h2d': pinned CPU tensor → GPU  (DataLoader input path)
+    direction='d2h': GPU tensor → pinned CPU  (inference output path)
 
-    Parameters
-    ----------
-    device_id : GPU index (0-based)
-    shape     : tensor shape tuple
-    nreps     : number of measured transfers
-    warmup    : number of transfers to discard before timing starts
-
-    Returns
-    -------
-    List of bandwidth samples in GB/s, one per measured transfer.
+    Uses synchronous blocking copies so wall-clock time equals actual transfer
+    time, not just the time to enqueue the DMA command.
     """
-    device = torch.device(f"cuda:{device_id}")
+    device  = torch.device(f"cuda:{device_id}")
+    nbytes  = 1
+    for d in shape: nbytes *= d
+    nbytes *= 4  # float32
 
-    # pin_memory=True allocates in page-locked CPU RAM, enabling direct DMA
-    # without a pageable-to-pinned bounce copy in the CUDA driver.
-    src = torch.randn(shape, dtype=torch.float32, pin_memory=True)
-    dst = torch.empty(shape, dtype=torch.float32, device=device)
-    nbytes = src.numel() * 4  # float32 = 4 bytes per element
+    if direction == "h2d":
+        src = torch.randn(shape, dtype=torch.float32, pin_memory=True)
+        dst = torch.empty(shape, dtype=torch.float32, device=device)
+        def transfer(): dst.copy_(src, non_blocking=False)
+    else:
+        src = torch.randn(shape, dtype=torch.float32, device=device)
+        dst = torch.empty(shape, dtype=torch.float32, pin_memory=True)
+        def transfer(): dst.copy_(src, non_blocking=False)
 
     results = []
     for i in range(nreps + warmup):
-        # Drain the GPU stream before starting the clock so we measure only
-        # the copy, not any preceding kernel activity.
         torch.cuda.synchronize(device)
         t0 = time.perf_counter()
-
-        # non_blocking=False makes this a synchronous copy: the call does not
-        # return until the DMA is complete. This matches how inference.py moves
-        # data to the GPU (x.to(device) without non_blocking).
-        dst.copy_(src, non_blocking=False)
-
+        transfer()
         torch.cuda.synchronize(device)
-        elapsed = time.perf_counter() - t0
-
         if i >= warmup:
-            results.append(nbytes / elapsed / 1e9)  # bytes/s → GB/s
-
+            results.append(nbytes / (time.perf_counter() - t0) / 1e9)
     return results
 
 
@@ -153,21 +173,16 @@ def measure_h2d(device_id: int, shape: tuple, nreps: int, warmup: int) -> List[f
 # Sequential test
 # ---------------------------------------------------------------------------
 
-def sequential_test(num_gpus: int) -> dict:
+def sequential_test(num_gpus: int, shapes: dict, direction: str) -> dict:
     """
-    Test each GPU independently with all others idle.
-
-    This gives the maximum attainable H2D bandwidth per GPU — no PCIe
-    contention, no competing DMA engines. Use this as the baseline to
-    compare against the concurrent results.
-
-    Returns a nested dict: {tensor_name: {gpu_id: [bandwidth_samples]}}
+    Test each GPU independently with all others idle — no contention baseline.
+    Returns {tensor_name: {gpu_id: [bandwidth_samples_GB/s]}}
     """
     results = {}
-    for name, shape in SHAPES.items():
+    for name, shape in shapes.items():
         results[name] = {}
         for gpu in range(num_gpus):
-            results[name][gpu] = measure_h2d(gpu, shape, NREPS, WARMUP)
+            results[name][gpu] = _measure(gpu, shape, NREPS, WARMUP, direction)
     return results
 
 
@@ -176,62 +191,38 @@ def sequential_test(num_gpus: int) -> dict:
 # ---------------------------------------------------------------------------
 
 def _worker(rank: int, shape: tuple, nreps: int, warmup: int,
-            result_queue) -> None:
+            direction: str, result_queue) -> None:
     """
-    Entry point for each child process in the concurrent test.
-
-    Each process owns one GPU (rank == GPU index) and independently measures
-    H2D bandwidth for the given shape. Results are passed back to the parent
-    via a multiprocessing Queue.
-
-    Using separate OS processes (not threads) is important: it mirrors the
-    torchrun setup where each GPU worker is a separate Python process, and it
-    avoids the GIL preventing true parallelism. Each process allocates its own
-    pinned CPU buffer, so the concurrent test stresses all PCIe lanes and NUMA
-    interconnects simultaneously.
+    Child process for concurrent test — one process per GPU, each allocating
+    its own pinned CPU buffer. Mirrors the torchrun multi-process setup.
     """
-    samples = measure_h2d(rank, shape, nreps, warmup)
+    samples = _measure(rank, shape, nreps, warmup, direction)
     result_queue.put((rank, samples))
 
 
-def concurrent_test(num_gpus: int) -> dict:
+def concurrent_test(num_gpus: int, shapes: dict, direction: str) -> dict:
     """
-    Test all GPUs simultaneously, each in its own process.
+    All GPUs transfer simultaneously in separate processes.
 
-    This is the contention test. All processes allocate pinned CPU memory and
-    run DMA transfers at the same time. If the node has a single PCIe root
-    complex shared across all GPUs, total bandwidth is fixed and each GPU
-    gets a fraction. If GPUs are on separate root complexes (or connected via
-    NVLink), bandwidth should stay near the sequential baseline.
-
-    Asymmetric degradation — where some GPUs slow down significantly and others
-    do not — indicates a NUMA topology issue: the slow GPUs are pulling data
-    across a CPU socket boundary rather than from their local NUMA node.
-
-    Returns a nested dict: {tensor_name: {gpu_id: [bandwidth_samples]}}
+    Reveals PCIe contention (symmetric drop across all GPUs) and NUMA penalty
+    (asymmetric drop on GPUs whose CPU process is on the far socket).
+    Returns {tensor_name: {gpu_id: [bandwidth_samples_GB/s]}}
     """
     results = {}
-    for name, shape in SHAPES.items():
+    for name, shape in shapes.items():
         q = mp.Queue()
-
-        # Spawn one child process per GPU, all starting at roughly the same
-        # time so their DMA transfers overlap.
         procs = [
-            mp.Process(target=_worker, args=(gpu, shape, NREPS, WARMUP, q))
+            mp.Process(target=_worker,
+                       args=(gpu, shape, NREPS, WARMUP, direction, q))
             for gpu in range(num_gpus)
         ]
-        for p in procs:
-            p.start()
-        for p in procs:
-            p.join()
-
-        # Collect results from the queue — order is non-deterministic.
+        for p in procs: p.start()
+        for p in procs: p.join()
         gpu_results = {}
         while not q.empty():
             gpu_id, samples = q.get()
             gpu_results[gpu_id] = samples
         results[name] = gpu_results
-
     return results
 
 
@@ -239,51 +230,42 @@ def concurrent_test(num_gpus: int) -> dict:
 # Output formatting
 # ---------------------------------------------------------------------------
 
-def print_results(label: str, results: dict, num_gpus: int) -> None:
+def print_results(label: str, results: dict, shapes: dict, num_gpus: int) -> None:
     """Print a per-GPU bandwidth table with one row per tensor type."""
-    print(f"\n{'='*70}")
+    print(f"\n{'='*75}")
     print(f"  {label}")
-    print(f"{'='*70}")
-    header = f"  {'tensor':<12}  {'size_MB':>7}  " + \
+    print(f"{'='*75}")
+    header = f"  {'tensor':<26}  {'size_MB':>7}  " + \
              "  ".join(f"GPU{g} GB/s" for g in range(num_gpus))
     print(header)
     print("  " + "-" * (len(header) - 2))
 
-    for name, shape in SHAPES.items():
+    for name, shape in shapes.items():
         mb = _mb(shape)
-        row = f"  {name:<12}  {mb:>7.1f}  "
-        gpu_data = results.get(name, {})
+        row = f"  {name:<26}  {mb:>7.1f}  "
         for g in range(num_gpus):
-            samples = gpu_data.get(g, [])
-            if samples:
-                row += f"  {statistics.median(samples):>8.2f}  "
-            else:
-                row += f"  {'N/A':>8}  "
+            samples = results.get(name, {}).get(g, [])
+            row += f"  {statistics.median(samples):>8.2f}  " if samples else f"  {'N/A':>8}  "
         print(row)
 
-    # Aggregate row: median bandwidth across all tensor types per GPU.
-    # This is the single number most comparable to compare_nsys.py's bw_GB/s.
+    # Median across all tensors per GPU — single summary number
     print()
-    row = f"  {'AGGREGATE':<12}  {'':>7}  "
+    row = f"  {'AGGREGATE (median)':<26}  {'':>7}  "
     for g in range(num_gpus):
-        all_samples = [s for name in SHAPES for s in results.get(name, {}).get(g, [])]
-        if all_samples:
-            row += f"  {statistics.median(all_samples):>8.2f}  "
+        all_s = [s for name in shapes for s in results.get(name, {}).get(g, [])]
+        row += f"  {statistics.median(all_s):>8.2f}  " if all_s else f"  {'N/A':>8}  "
     print(row)
 
 
-def contention_delta(seq: dict, con: dict, num_gpus: int) -> None:
+def contention_delta(seq: dict, con: dict, shapes: dict, num_gpus: int) -> None:
     """
-    Print the per-GPU bandwidth change from sequential to concurrent.
-
-    A negative delta means the GPU is slower under load. Uniform small
-    negatives suggest mild shared-bus contention. A large negative on only
-    some GPUs is the NUMA signature: those GPUs are on the far socket.
+    Per-GPU bandwidth change from sequential to concurrent.
+    Symmetric drop → shared bus contention. Asymmetric drop → NUMA penalty.
     """
-    print(f"\n  Contention delta (concurrent − sequential), median across all tensor sizes:")
+    print(f"\n  Contention delta (concurrent − sequential), median across all tensors:")
     for g in range(num_gpus):
-        seq_bw = [s for name in SHAPES for s in seq.get(name, {}).get(g, [])]
-        con_bw = [s for name in SHAPES for s in con.get(name, {}).get(g, [])]
+        seq_bw = [s for name in shapes for s in seq.get(name, {}).get(g, [])]
+        con_bw = [s for name in shapes for s in con.get(name, {}).get(g, [])]
         if seq_bw and con_bw:
             delta = statistics.median(con_bw) - statistics.median(seq_bw)
             pct   = delta / statistics.median(seq_bw) * 100
@@ -306,26 +288,38 @@ def main():
     print(f"\nNode GPU summary:")
     for i, p in enumerate(props):
         print(f"  GPU{i}: {p.name}  ({p.total_memory/1e9:.1f} GB)")
+    print(f"\nConfig: batch_per_gpu={BATCH_PER_GPU}  upper_channels={UPPER_CHANNELS}"
+          f"  inference_steps={INFERENCE_STEPS}")
+    print(f"Warmup={WARMUP}  Reps={NREPS}")
 
-    print(f"\nTransfer sizes (float32, pinned CPU → GPU):")
-    for name, shape in SHAPES.items():
-        print(f"  {name:<12} {_mb(shape):.1f} MB  shape={shape}")
-    print(f"\nWarmup={WARMUP} transfers discarded  |  Measured reps={NREPS}")
+    print(f"\nH2D shapes (DataLoader inputs — CPU → GPU each inference step):")
+    for name, shape in H2D_SHAPES.items():
+        print(f"  {name:<26} {_mb(shape):6.1f} MB  {shape}")
 
-    # Sequential — establishes the per-GPU bandwidth ceiling with no contention
-    print("\nRunning sequential test (one GPU at a time)...")
-    seq = sequential_test(num_gpus)
-    print_results("Sequential H2D bandwidth — no contention (one GPU at a time)", seq, num_gpus)
+    print(f"\nD2H shapes (stacked outputs — GPU → CPU after all steps complete):")
+    for name, shape in D2H_SHAPES.items():
+        print(f"  {name:<26} {_mb(shape):6.1f} MB  {shape}")
 
-    # Concurrent — all GPUs transferring simultaneously in separate processes,
-    # mirroring the actual torchrun multi-process inference setup
-    print("\nRunning concurrent test (all GPUs simultaneously, separate processes)...")
-    con = concurrent_test(num_gpus)
-    print_results("Concurrent H2D bandwidth — under load (all GPUs at once)", con, num_gpus)
+    # --- H2D (DataLoader → GPU) ---
+    print("\n\nRunning H2D sequential test (one GPU at a time)...")
+    h2d_seq = sequential_test(num_gpus, H2D_SHAPES, "h2d")
+    print_results("H2D Sequential — no contention", h2d_seq, H2D_SHAPES, num_gpus)
 
-    # Delta — key diagnostic: symmetric drop = PCIe contention,
-    # asymmetric drop = NUMA penalty on specific GPUs
-    contention_delta(seq, con, num_gpus)
+    print("\nRunning H2D concurrent test (all GPUs simultaneously)...")
+    h2d_con = concurrent_test(num_gpus, H2D_SHAPES, "h2d")
+    print_results("H2D Concurrent — under load", h2d_con, H2D_SHAPES, num_gpus)
+    contention_delta(h2d_seq, h2d_con, H2D_SHAPES, num_gpus)
+
+    # --- D2H (GPU → CPU, stacked inference outputs) ---
+    print("\n\nRunning D2H sequential test (one GPU at a time)...")
+    d2h_seq = sequential_test(num_gpus, D2H_SHAPES, "d2h")
+    print_results("D2H Sequential — no contention", d2h_seq, D2H_SHAPES, num_gpus)
+
+    print("\nRunning D2H concurrent test (all GPUs simultaneously)...")
+    d2h_con = concurrent_test(num_gpus, D2H_SHAPES, "d2h")
+    print_results("D2H Concurrent — under load", d2h_con, D2H_SHAPES, num_gpus)
+    contention_delta(d2h_seq, d2h_con, D2H_SHAPES, num_gpus)
+
     print()
 
 

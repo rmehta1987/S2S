@@ -318,13 +318,19 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 | Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 21 | 26–52 GB/s³ | 10–17% | 0.018 ms⁴ | n/a⁵ | n/a⁵ | ✗⁵ |
 | Midway AMD | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 32 | 35–54 GB/s³ | ~0%⁶ | 0.012 ms⁴ | n/a⁵ | n/a⁵ | ✗⁵ |
 
-¹ `nvidia-smi topo -m` was never captured for the NVIDIA cluster so the NVLink configuration is unknown. H100 NVL typically shows NV6 between paired GPUs but this was not verified.  
-² NVIDIA bandwidth figures come from the nsys profile (actual inference transfers, ~165 MB tensors). Midway bandwidth figures come from `bandwidth_test.py` (synthetic tensors, max 13.6 MB upper_air). These measure different transfer sizes and are not directly comparable in absolute GB/s — the relative contention delta is the meaningful comparison.  
-³ GPU0 is anomalously slow in the sequential test on both Midway nodes. Intel GPU0 upper_air: 26.7 GB/s vs GPU1–3 at 52 GB/s. AMD GPU0 upper_air: 43.0 GB/s vs GPU2/3 at 54 GB/s (different tensor; AMD AGGREGATE shows GPU0=35.9 GB/s). The GPU0–NIC0 PXB link is present on both nodes but GPU1 also shares a PXB with NIC1 yet is fast, so this is not a complete explanation.  
-⁴ Median inter-step dispatch gap from `inference_dispatch_smoke.py` on one GPU, synthetic 87 ms/step workload (6× heavier than real PanguModel). Pattern D (CUDA Graph) was 2.5–3× *slower* than pattern A (list-append): Intel 0.046 vs 0.018 ms, AMD 0.037 vs 0.012 ms. The conclusion is that both are far below 10 ms — not that A ≈ D — so Python dispatch is unlikely to explain 10–50 ms DSI gaps, though the test does not reproduce 4-GPU DDP conditions on DSI.  
-⁵ ptrace restrictions on the test partition prevented nsys from capturing torchrun worker GPU activity. Kernel utilisation and gap histograms unavailable.  
-⁷ The `nvidia-smi topo -m` CPU Affinity column suggests GPU0/1 are on the same socket as CPUs 0–23/0–31 and GPU2/3 on CPUs 24–47/32–63. However, the `GPU NUMA ID` column reads `N/A` on both nodes, meaning the GPU-to-NUMA mapping was not confirmed by the hardware at time of profiling.  
-⁶ AMD EPYC shows ~0% concurrent bandwidth change in the AGGREGATE median. For the largest individual tensor (upper_air, 81.8 MB), concurrent bandwidth was actually higher than sequential on some GPUs — consistent with measurement noise rather than a clean architectural conclusion. The "zero contention" claim holds for the aggregate metric but should not be over-interpreted.
+¹ We never ran the GPU interconnect topology check on the NVIDIA cluster, so we don't know if its H100 NVL cards use NVLink or not.
+
+² The NVIDIA and DSI bandwidth numbers were measured during actual inference (large ~165 MB data tensors moving to the GPU each step). The Midway bandwidth numbers were from a dedicated test that used much smaller tensors (max 14 MB). The absolute GB/s numbers are not directly comparable between clusters — what matters is the relative drop when all 4 GPUs transfer at the same time versus one at a time.
+
+³ On both Midway nodes, GPU0 was noticeably slower than the other three GPUs even when tested alone with no other GPUs active. On Intel, GPU0 reached 27 GB/s for large transfers while GPU1–3 reached 52 GB/s. On AMD the gap was smaller. The cause is unclear — one possibility is that GPU0's physical slot on the server motherboard shares a data pathway with a network card, adding interference. This is unconfirmed and would require inspecting the server's physical wiring diagram.
+
+⁴ This was measured on a single GPU running a synthetic model that was 6× slower per step than real Pangu. The GPU sat idle for 0.018 ms (Intel) or 0.012 ms (AMD) between steps — far below the 10–50 ms gaps seen on DSI. Notably, the CUDA Graph approach was 2–3× *slower* than the standard Python loop (0.046 ms vs 0.018 ms Intel), because it still has to copy new input data into fixed memory buffers before each replay. This test only covers single-GPU behaviour and does not reproduce the 4-GPU setup where DSI's gaps appear.
+
+⁵ A security restriction on Midway's test partition prevented the profiler from attaching to the GPU worker processes (of which there are 4, one per GPU). All the GPU timing data for Midway H200 therefore comes from the bandwidth test and dispatch smoke test above, not from a full inference profile.
+
+⁶ When all 4 AMD GPUs transferred data simultaneously, throughput barely changed compared to one GPU at a time (less than 2% difference). For the Intel node the drop was 10–17%. However, for the largest individual tensor on AMD the concurrent run was sometimes slightly *faster* than the sequential run, which is more consistent with measurement noise than a real architectural improvement. The "zero contention" result should be taken as "no meaningful contention detected" rather than a precise measurement.
+
+⁷ The server topology report suggested GPU0 and GPU1 share one CPU socket (cores 0–23 on Intel, 0–31 on AMD) while GPU2 and GPU3 share the other socket (cores 24–47 / 32–63). However, the GPU-side confirmation field in the report was blank on both nodes, so this is an inference from the CPU affinity hints rather than a direct readout.
 
 ### Key findings from the Midway benchmarks
 
