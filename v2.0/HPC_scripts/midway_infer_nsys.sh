@@ -31,7 +31,7 @@ eval "$(mamba shell hook --shell bash)"
 mamba activate /project/pedramh/shared/S2S/v2.0/venv
 
 module unload cuda
-module load cuda/12.6
+module load cuda/12.9
 
 export WANDB_MODE=offline
 
@@ -55,6 +55,7 @@ nsys profile \
     -o "${NSYS_OUT}" \
     --force-overwrite=true \
     --trace-fork-before-exec=true \
+    --target-processes=all \
     torchrun \
         --standalone \
         --nproc_per_node="${NUM_GPUS}" \
