@@ -38,7 +38,25 @@ export WANDB_MODE=offline
 echo "=== midway_infer_nsys: $(date -Iseconds) ==="
 echo "JOB_ID=${SLURM_JOB_ID}  NODELIST=${SLURM_NODELIST}"
 nvidia-smi -L
+echo
+echo "--- nvidia-smi topo -m ---"
 nvidia-smi topo -m
+echo
+echo "--- numactl --hardware ---"
+numactl --hardware 2>/dev/null || true
+echo
+echo "--- cpu / power state (dispatch-latency suspects) ---"
+cpupower frequency-info 2>/dev/null | head -20 || true
+cpupower idle-info     2>/dev/null | head -20 || true
+cat /sys/module/intel_idle/parameters/max_cstate 2>/dev/null || true
+echo
+echo "--- nvidia IRQ steering ---"
+grep -E "nvidia" /proc/interrupts 2>/dev/null | head -8 || true
+echo
+echo "--- driver / cuda versions ---"
+nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1
+python -c "import torch; print(f'torch={torch.__version__}, cuda={torch.version.cuda}')" 2>/dev/null || true
+echo
 
 NUM_GPUS=$(nvidia-smi -L | wc -l)
 echo "NUM_GPUS=${NUM_GPUS}"

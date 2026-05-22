@@ -1,18 +1,18 @@
 # S2S Training Speed Benchmark Report
 **Date:** 2026-05-11  
-**Hardware:** 4 × NVIDIA H100 NVL graphics processing units, ~94–96 GB memory each  
+**Hardware:** 4 × NVIDIA H100 NVL GPUs, ~94–96 GB memory each  
 **Model:** Pangu with variational autoencoder ensemble generation  
 ---
 
 ## What we are measuring
 
 Each training step consists of:
-1. Loading a batch of weather data from disk and moving it to the graphics card
+1. Loading a batch of weather data from disk and moving it to the GPU
 2. Running the model forward to produce an ensemble forecast and compute the loss
 3. Running the backward pass to compute gradients
 4. Updating the model weights with the Adam optimiser
 
-First did some manual measurements to see how long each step takes at steady state — after an initial 20-step warm-up period that lets the graphics drivers and communication libraries initialise. We run 80 measured steps per job and record the median step time (the middle value of the 80 samples) and throughput in samples per second.
+First did some manual measurements to see how long each step takes at steady state — after an initial 20-step warm-up period that lets the GPU drivers and communication libraries initialise. We run 80 measured steps per job and record the median step time (the middle value of the 80 samples) and throughput in samples per second.
 
 ---
 
@@ -23,21 +23,21 @@ Both runs used the original code exactly with a few exceptions, 16-bit floating 
 | | Run 1 | Run 2 |
 |---|---|---|
 | Date/time | 2026-05-11 09:45 | 2026-05-11 10:23 |
-| Samples per graphics card per step | 1 | 1 |
-| Global samples per step (4 cards) | 4 | 4 |
+| Samples per GPU per step | 1 | 1 |
+| Global samples per step (4 GPUs) | 4 | 4 |
 | Median step time | 0.639 s | 0.638 s |
 | 90th-percentile step time | 0.643 s | 0.641 s |
 | Step-to-step variation (standard deviation) | 0.005 s | 0.002 s |
 | Data loading time per step | 0.003 s | 0.003 s |
 | Compute time per step | 0.636 s | 0.636 s |
 | **Throughput** | **6.26 samples/s** | **6.27 samples/s** |
-| Peak graphics memory (worst card) | 34.96 GB | 34.96 GB |
+| Peak GPU memory (worst card) | 34.96 GB | 34.96 GB |
 | Loss scale skips (numerical instability events) | 0 | 0 |
 
 **Key observations:**
 - The two runs agree to within 0.05% — the node is stable and the measurement is repeatable.
-- Data loading takes 0.003 s out of 0.639 s total (0.4% of step time). The bottleneck is entirely on the graphics card, not disk or data transfer.
-- 34.96 GB used out of ~94 GB available — only 37% of graphics memory is occupied. This leaves substantial headroom for optimisations.
+- Data loading takes 0.003 s out of 0.639 s total (0.4% of step time). The bottleneck is entirely on the GPU, not disk or data transfer.
+- 34.96 GB used out of ~94 GB available — only 37% of GPU memory is occupied. This leaves substantial headroom for optimisations.
 - Zero loss scale skips confirm the model is numerically well-behaved in 16-bit arithmetic.
 
 **This establishes the baseline: 0.639 s per step, 6.26 samples per second.**
@@ -46,9 +46,9 @@ Both runs used the original code exactly with a few exceptions, 16-bit floating 
 
 ## Profiler analysis (Nsight Systems trace)
 
-Also ran a separate profiling job with full graphics card timeline recording to understand where time is spent inside each step. The capture was limited to the 80 measured steps only (warm-up excluded).
+Also ran a separate profiling job with full GPU timeline recording to understand where time is spent inside each step. The profiler is NVIDIA's **Nsight Systems** (`nsys` for short): it records every CUDA event — kernel launches, memory copies, synchronisations — with nanosecond precision and writes a `.nsys-rep` file we can post-process. The capture was limited to the 80 measured steps only (warm-up excluded).
 
-### Time breakdown per step (one graphics card)
+### Time breakdown per step (one GPU)
 
 | Phase | Median time | Share of step |
 |---|---|---|
@@ -57,23 +57,19 @@ Also ran a separate profiling job with full graphics card timeline recording to 
 | Backward pass (gradient computation) | 425.8 ms | 63.9% |
 | Weight update (optimiser) | 26.3 ms | 3.9% |
 
-The backward pass is **2.2 times longer than the forward pass**. In a normally configured model the backward pass is roughly 1.5–2 times the forward pass due to the extra gradient mathematics. The excess here is caused by gradient checkpointing (see below).
+The backward pass is **2.2 times longer than the forward pass**. In a normally configured transformer the backward pass is typically 1.5–2× the forward pass due to gradient mathematics; the 2.2× ratio observed here is on the high side but, on later inspection of the source code, is **not** driven by gradient recomputation — the transformer-block checkpointing call in `pangu.py` is commented out, so no forward work is being re-run (see the "Remaining experiments — gradient checkpointing investigation" section below for the source-code check). The ratio appears to be inherent to the model depth and the per-layer kernel mix.
 
-### Gradient checkpointing
+### LayerNorm backward kernel
 
-Gradient checkpointing is a memory-saving technique. During the forward pass, instead of storing all intermediate layer outputs in memory for later use in the backward pass, the model discards them. When the backward pass needs those outputs to compute gradients, it re-runs the relevant portion of the forward pass from scratch to regenerate them.
+The layer normalisation backward kernel is the second-largest consumer of GPU time in the entire profile (17.3 seconds of total recorded time across 80 measured steps). It dominates because the model contains many normalisation layers — each is invoked once in the forward and once in the backward — not because of any recomputation pass. Fusing LayerNorm into adjacent operations via `torch.compile` is the largest single optimisation opportunity the profile suggests.
 
-The configuration `checkpointing: 2` in the experiment file means roughly every other transformer layer group is checkpointed. This means approximately half of the forward computation is re-run during the backward pass, which explains why backward takes 2.2× longer than forward rather than the expected ~1.5–1.7×.
-
-The layer normalisation backward kernel is the second-largest consumer of graphics card time in the entire profile (17.3 seconds of total recorded time), because it is being re-run repeatedly during the recomputation. 
-
-**Gradient checkpointing was designed to fit the model in memory.** At 34.96 GB used out of ~94 GB available, there is roughly 59 GB of free memory. Reducing or disabling checkpointing would allow layer outputs to be stored rather than recomputed, potentially cutting backward time by 20–30% — but at the cost of using more graphics memory. This memory would not then be available for larger batch sizes.
+**Memory headroom for larger batches.** Peak memory is 34.96 GB out of ~94 GB available, leaving roughly 59 GB free. This headroom is what allows the batch-size-2-per-card experiment below (which uses ~69 GB) to fit without an out-of-memory crash.
 
 ### Other profiling findings
 
 **Memory layout conversions (4.4 seconds of recorded time):** The model switches between two different ways of arranging data in memory (channel-first and channel-last layouts) between layers. Each conversion wastes time. Fixing the model to use one consistent layout throughout would eliminate this overhead.
 
-**Communication between graphics cards (15.8 seconds of recorded time, ~7.7% of step):** After every backward pass, PyTorch synchronises the gradients across all 4 cards so each card has an identical update to apply. This uses the inter-GPU communication fabric. The `find_unused_parameters` flag (described below) adds overhead to this process.
+**Communication between GPUs (15.8 seconds of recorded time, ~7.7% of step):** After every backward pass, PyTorch synchronises the gradients across all 4 GPUs so each one applies an identical update. This uses the inter-GPU communication fabric (NCCL — NVIDIA's collective communication library). The `find_unused_parameters` flag (described below) adds overhead to this process.
 
 **Roll operations (7.7 seconds of recorded time):** The shifted-window attention mechanism cyclically shifts feature maps before computing attention. These shift operations run as separate kernels and account for ~24 ms per step across all cards. They are an architectural characteristic and are difficult to optimise without changing the model design.
 
@@ -83,20 +79,20 @@ The layer normalisation backward kernel is the second-largest consumer of graphi
 
 ## Ablation 1: batch size 3 per card, bfloat16 arithmetic, static graph
 
-This run changed three things simultaneously: larger batch size (3 samples per card instead of 1, for 12 total), switched from 16-bit to brain 16-bit floating point, and disabled the unused-parameter search.
+This run changed three things simultaneously: larger batch size (3 samples per card instead of 1, for 12 total), switched from 16-bit to bfloat16 floating point, and disabled the unused-parameter search.
 
 | | Baseline | This run |
 |---|---|---|
-| Samples per card per step | 1 | 3 |
-| Floating point format | 16-bit | brain 16-bit |
+| Samples per GPU per step | 1 | 3 |
+| Floating point format | 16-bit | bfloat16 |
 | Unused-parameter search | enabled | disabled |
 | Median step time | 0.639 s | 3.314 s |
 | **Throughput** | **6.26 samples/s** | **3.62 samples/s** |
-| Peak graphics memory (worst card) | 34.96 GB | **97.02 GB** |
+| Peak GPU memory (worst card) | 34.96 GB | **97.02 GB** |
 
 **Result: 42% slower than baseline despite 3× larger batch.** This is worse in every meaningful sense.
 
-**Why:** Graphics memory reached 97 GB — at or beyond the physical limit of the card. The memory allocator was operating under extreme pressure: fragmentation, reallocation overhead, and activations too large to keep efficiently in the fast on-chip cache all compound. The step time scaled 5.2× for only 3× more data — the signature of memory saturation. The `batch_size: 16` (4 per card) configuration triggered an out-of-memory crash before producing results.
+**Why:** GPU memory reached 97 GB — at or beyond the physical limit of the card. The memory allocator was operating under extreme pressure: fragmentation, reallocation overhead, and activations too large to keep efficiently in the fast on-chip cache all compound. The step time scaled 5.2× for only 3× more data — the signature of memory saturation. The `batch_size: 16` (4 per card) configuration triggered an out-of-memory crash before producing results.
 
 Because three variables changed at once, we cannot attribute the result to any one of them. This run was not a useful data point for decision-making.
 
@@ -107,24 +103,24 @@ Because three variables changed at once, we cannot attribute the result to any o
 This run isolated the numeric format and distributed training changes by keeping batch size at 1 per card (4 global), matching the baseline.
 
 **Changes from baseline:**
-1. Switched from 16-bit floating point to brain 16-bit floating point. The brain 16-bit format has the same numeric range as 32-bit (preventing overflow) but uses only 16 bits. On the H100 card it is natively supported and eliminates the need for the dynamic loss scaler that 16-bit requires.
+1. Switched from 16-bit floating point to **bfloat16** ("brain floating-point 16", a 16-bit format from Google Brain with the same exponent range as 32-bit). bfloat16 has the same numeric range as 32-bit (preventing overflow) but uses only 16 bits. On the H100 it is natively supported and eliminates the need for the dynamic loss scaler that 16-bit requires.
 2. Disabled the unused-parameter search in distributed training (`find_unused_parameters=False`, `static_graph=True`). Before each weight update, PyTorch ordinarily traverses the computation graph to identify any model parameters that did not receive a gradient. Two parameters in the Pangu model are permanently unused (their code paths are commented out in the source), so this traversal was wasted work every step. Freezing those parameters and disabling the search removes the overhead.
 
 | | Baseline | This run | Change |
 |---|---|---|---|
-| Samples per card per step | 1 | 1 | — |
-| Floating point format | 16-bit | brain 16-bit | changed |
+| Samples per GPU per step | 1 | 1 | — |
+| Floating point format | 16-bit | bfloat16 | changed |
 | Unused-parameter search | enabled | disabled | changed |
 | Median step time | 0.639 s | **0.607 s** | **−5.0%** |
 | **Throughput** | **6.26 samples/s** | **6.59 samples/s** | **+5.3%** |
-| Peak graphics memory | 34.96 GB | 34.96 GB | no change |
+| Peak GPU memory | 34.96 GB | 34.96 GB | no change |
 | Numeric instability events | 0 | 0 | — |
 
 **Result: 5.3% throughput improvement with no memory cost and no numerical issues.**
 
 Memory did not change because at this batch size the dominant memory consumers are the 32-bit optimiser state (Adam momentum and variance buffers, which are always stored in full 32-bit precision) and the activations, not the numeric format of the computation itself.
 
-Zero numeric instability events with brain 16-bit confirms the model is safe to train in this format. This was expected: the baseline already showed zero instability events in 16-bit arithmetic, and brain 16-bit has a strictly wider numeric range, so any computation that is stable in 16-bit is guaranteed to be stable in brain 16-bit.
+Zero numeric instability events with bfloat16 confirms the model is safe to train in this format. This was expected: the baseline already showed zero instability events in 16-bit arithmetic, and bfloat16 has a strictly wider numeric range, so any computation that is stable in 16-bit is guaranteed to be stable in bfloat16.
 
 ---
 
@@ -134,12 +130,12 @@ Zero numeric instability events with brain 16-bit confirms the model is safe to 
 |---|---|---|---|---|---|
 | **Baseline** (16-bit, batch=1/card) | 0.639 s | 6.26 samples/s | — | 35.0 GB | 0 |
 | Baseline repeat | 0.638 s | 6.27 samples/s | +0.05% | 35.0 GB | 0 |
-| Brain 16-bit + static graph, batch=3/card | 3.314 s | 3.62 samples/s | −42% | 97.0 GB ⚠ | 0 |
-| Brain 16-bit + static graph, batch=1/card | 0.607 s | 6.59 samples/s | +5.3% | 35.0 GB | 0 |
+| bfloat16 + static graph, batch=3/card | 3.314 s | 3.62 samples/s | −42% | 97.0 GB ⚠ | 0 |
+| bfloat16 + static graph, batch=1/card | 0.607 s | 6.59 samples/s | +5.3% | 35.0 GB | 0 |
 | 16-bit + static graph, batch=2/card | 1.160 s | 6.90 samples/s | +10.1% | 69.0 GB | 4 ⚠ |
-| **Brain 16-bit + static graph, batch=2/card** | **1.146 s** | **6.98 samples/s** | **+11.4%** | **69.0 GB** | **0** |
+| **bfloat16 + static graph, batch=2/card** | **1.146 s** | **6.98 samples/s** | **+11.4%** | **69.0 GB** | **0** |
 
-The best confirmed configuration is brain 16-bit arithmetic with the static distributed training graph and 2 samples per card — **+11.4% throughput, zero numeric instability events, 73% graphics memory utilisation**.
+The best confirmed configuration is bfloat16 arithmetic with the static distributed training graph and 2 samples per card — **+11.4% throughput, zero numeric instability events, 73% GPU memory utilisation**.
 
 ---
 
@@ -148,7 +144,7 @@ The best confirmed configuration is brain 16-bit arithmetic with the static dist
 **Next — Just-in-time compilation (in progress):**  
 PyTorch's just-in-time kernel compiler (`torch.compile`, mode `reduce-overhead`) fuses consecutive element-wise operations into single GPU kernels. The profiler found that element-wise operations are the single largest consumer of GPU time across the 80 measured steps — over 30 seconds of the total recorded time — because they are currently launched as hundreds of individual small kernels. Compilation would collapse many of these into a single fused operation, reducing both launch overhead and memory bandwidth pressure.
 
-The warmup period has been raised from 20 to 40 steps to allow Triton kernel compilation to settle before timing starts. The compiled steady-state throughput is what will be recorded. Both the wall-clock benchmark script and the Nsight profiling script have been updated to use `reduce-overhead` mode and brain 16-bit arithmetic simultaneously, so the new profile can be compared directly against the original.
+The warmup period has been raised from 20 to 40 steps to allow Triton kernel compilation to settle before timing starts (Triton is the GPU-kernel compiler `torch.compile` uses internally to generate fused kernels). The compiled steady-state throughput is what will be recorded. Both the wall-clock benchmark script and the Nsight profiling script have been updated to use `reduce-overhead` mode and bfloat16 arithmetic simultaneously, so the new profile can be compared directly against the original.
 
 **Gradient checkpointing investigation:**  
 Code analysis revealed that transformer block checkpointing is commented out in the source — the `checkpointing` value in the configuration file only controls 4 lightweight patch recovery operations, not the transformer blocks themselves. Changing `checkpointing: 2` to `checkpointing: 1` has no effect. Setting it to `0` disables only those 4 patch recovery operations and is expected to give a small gain. The 2.2× backward-to-forward ratio observed in the profiler is inherent to the model depth, not recomputation overhead.
@@ -200,32 +196,32 @@ When variance collapses (var_q → 0) this becomes `−0.5 / var_p` — a negati
 | Monte Carlo dropout | Keep dropout active at inference, run 4 passes with different dropout masks | No | Low |
 | Diffusion in latent space | Score-based sampling from a learned noise schedule | No (separate diffusion head) | Moderate — but principled and current state of the art for this problem |
 
-Google DeepMind's GenCast (2023) uses the diffusion approach on a Pangu-style backbone and currently represents the state of the art for probabilistic medium-range forecasting. The second encoder branch in this model adds training-time compute (it is always gradient-checkpointed) and inference-time architectural complexity for a benefit that depends entirely on the KL weight being correctly tuned.
+Google DeepMind's GenCast (2023) uses the diffusion approach on a Pangu-style backbone and currently represents the state of the art for probabilistic medium-range forecasting. The second encoder branch in this model adds training-time compute and inference-time architectural complexity for a benefit that depends entirely on the KL weight being correctly tuned.
 
 ### Estimated compute cost of the second encoder branch
 
-The second encoder branch (`layer1_e2 → downsample_e2 → layer2_e2 → layer3_e3`) mirrors the main encoder's first three stages. The model configuration uses transformer block depths of `[2, 6, 6, 2]`, so the main encoder runs 2 + 6 + 6 = 14 transformer blocks and the second encoder runs the same 14 blocks on the target data. Both paths run sequentially on the same GPU stream.
+The second encoder branch (`layer1_e2 → downsample_e2 → layer2_e2 → layer3_e3`) mirrors the main encoder's first three stages. The model configuration uses transformer block depths of `[2, 6, 6, 2]`, so the main encoder runs 2 + 6 + 6 = 14 transformer blocks and the second encoder runs the same 14 blocks on the target data. Both paths run sequentially on the same GPU stream (a stream is a queue of operations that execute in order; operations on different streams can overlap, but here both encoders share one queue, so the second one waits for the first to finish).
 
 From the profiler run at batch size 1 (16-bit, original code), the entire forward pass takes **194 ms**. That 194 ms covers:
 - Main encoder (14 blocks + patch embedding + downsample)
-- VAE second encoder (14 blocks + downsample), always checkpointed
+- VAE second encoder (14 blocks + downsample)
 - VAE first encoder (3 lightweight 1×1 convolutions) — negligible
 - Decoder (2 blocks + upsample + patch recovery)
 
 The decoder is shallower (2 blocks) and the patch embedding is a single convolution. The two 14-block encoders together are by far the dominant cost. Assuming the two encoders run at similar throughput and each accounts for roughly equal time, the second encoder is estimated at **40–70 ms of the 194 ms forward pass (20–36%)**.
 
-Because the second encoder is also gradient-checkpointed, its forward computation is re-run during the backward pass. This adds a further estimated **40–70 ms to the 425 ms backward pass**.
+The second encoder's backward pass adds an estimated **60–100 ms** (standard gradient computation; transformer-block checkpointing is commented out in source — see the "Remaining experiments" section above — so its activations are stored and the backward does not pay a recomputation cost). The 60–100 ms range is the typical ~1.5× of forward seen for self-attention blocks without recomputation.
 
-**Combined estimated cost of the second encoder: 80–140 ms per training step**, or roughly **12–21% of total step time** at the current batch size of 1.
+**Combined estimated cost of the second encoder: 100–170 ms per training step**, or roughly **15–25% of total step time** at the current batch size of 1.
 
-| Component | Forward | Backward (recomputation) | Total per step |
+| Component | Forward | Backward (gradients only, no recomputation) | Total per step |
 |---|---|---|---|
-| Second encoder (estimated) | 40–70 ms | 40–70 ms | **80–140 ms** |
-| As fraction of step time | 6–11% | 6–11% | **12–21%** |
+| Second encoder (estimated) | 40–70 ms | 60–100 ms | **100–170 ms** |
+| As fraction of step time | 6–11% | 9–15% | **15–25%** |
 
-These are estimates based on the block count and the 194 ms forward time. The next Nsight profiling run includes dedicated NVTX markers (`vae_encoder1` and `vae_encoder2`) inside `pangu.py` so the actual measured numbers will replace these estimates. Once the profiler output is available, this table will be updated with measured values.
+These are estimates based on the block count and the 194 ms forward time. The next Nsight profiling run includes dedicated NVTX markers (`vae_encoder1` and `vae_encoder2`) inside `pangu.py` — NVTX markers are annotations injected into the code so the profiler can label regions of the timeline by name — so the actual measured numbers will replace these estimates. Once the profiler output is available, this table will be updated with measured values.
 
-If the posterior collapse test confirms the second encoder is not producing a useful training signal — which is likely given the 0.0001 regularisation weight — removing it would recover approximately **12–21% of training step time** at no cost to model quality.
+If the posterior collapse test confirms the second encoder is not producing a useful training signal — which is likely given the 0.0001 regularisation weight — removing it would recover approximately **15–25% of training step time** at no cost to model quality.
 
 Overall:
 
@@ -244,9 +240,9 @@ The Data Science Institute provided access to a node with 4 × H200 GPUs and ran
 
 The profiles were exported to SQLite with `nsys export --type=sqlite` and analysed with `v2.0/HPC_scripts/compare_nsys.py`.
 
-### The compute work is identical everywhere
+### The compute work is similar across clusters
 
-The first thing the profiler makes clear is that the actual on-GPU computation — the time the graphics card spends executing model kernels — is nearly the same across all three setups: roughly 14 seconds per GPU on DSI and 15 seconds per GPU on NVIDIA. The H200 is not slower than the H100 at doing the work itself. The gap is entirely in the time the GPU spends sitting idle between bursts of work.
+The first thing the profiler shows is that the total on-GPU kernel-active time agrees within ~10% across all three setups: roughly 14 seconds per GPU on DSI and 15 seconds per GPU on NVIDIA. This is consistent with the H200 doing the inference work at a similar per-GPU rate to the H100 for this model — but it does not by itself establish per-kernel parity. The two clusters did not hold the software stack constant (NVIDIA runs inside the NGC apptainer image with one CUDA/cuDNN, DSI is bare-metal with possibly different versions; the nsys version per cluster was also not recorded), and the captured iteration counts may differ slightly. With those caveats noted, the gap in wall time is still dominated by GPU idle time between bursts of work, not by per-kernel slowdown.
 
 | Setup | Per-GPU compute (active_ms) | Elapsed wall time (window_ms) | Utilisation |
 |---|---|---|---|
@@ -273,33 +269,49 @@ Between every pair of consecutive GPU kernels there is either zero gap (the next
 
 The 10–50 ms bucket is the main outlier going from  41 occurrences on DSI with 1 GPU, to 423 occurrences on DSI with 4 GPUs, while NVIDIA with 4 GPUs has only 27. These are weird (not really sure) and not data loading stalls (which would would show up as gaps of 100 ms or more); they are the GPU going briefly idle waiting for the CPU to signal the next kernel launch.
 
-torchrun spawns 4 independent Python processes — one per GPU — so there is no single shared bottleneck across ranks. The cause of the stalls is therefore within each individual rank: something about the DSI cluster's CPU-to-GPU dispatch path adds 10–50 ms between consecutive kernel groups. The measured cumulative idle time across all gaps >10 ms is 72,026 ms on DSI 4-GPU vs 24,667 ms on NVIDIA — a difference of ~47 s — which accounts for most of the wall-time gap shown in the table above.
+`torchrun` (PyTorch's distributed launcher) spawns 4 independent Python processes — one per GPU — so there is no shared application-level synchronisation across ranks. However, the four ranks still share host-level resources: CPU cores, memory bandwidth, the PCIe root complex, kernel locks (mmap, page-fault handling), and IRQ paths. The 41→423 jump in 10–50 ms gaps on GPU0 when scaling from 1 GPU to 4 GPUs is itself evidence of inter-rank contention via these shared host resources, not a constant per-rank dispatch cost. The measured cumulative idle time across all gaps >10 ms is 72,026 ms on DSI 4-GPU vs 24,667 ms on NVIDIA — a difference of ~47 s — which accounts for most of the wall-time gap shown in the table above.
 
-### PCIe bandwidth contention makes it worse
+### H2D bandwidth: the production-sized tensors are fine; small transfers are the contended ones
 
-On the NVIDIA cluster, each GPU's host-to-device transfer bandwidth is consistent whether using 1 GPU or 4 — roughly 42–45 GB/s per card. On DSI, the single-GPU bandwidth is 41.6 GB/s, but under 4-GPU load GPU0 and GPU3 drop to 31–33 GB/s. Some possible reasons could be PCIe contention, the DSI node's four H200s appear to share fewer PCIe root complex lanes (**googled for this answer not sure though**), so when all four GPUs are simultaneously pulling data from the CPU they compete with each other. The slower data transfer contributes directly to the 10–50 ms stalls above.
+A note on the hardware: **PCIe** (PCI Express) is the bus that connects the GPU to the CPU and to system RAM; every byte of weather data the model reads off disk has to cross PCIe before it can sit in GPU memory. The relevant theoretical ceiling for H100 NVL / H200 (both PCIe Gen5 ×16) is ~64 GB/s in each direction; in practice you see ~70–80% of that at best.
 
-| Setup | GPU0 bandwidth | GPU1 | GPU2 | GPU3 |
-|---|---|---|---|---|
-| DSI H200 1-GPU | 41.6 GB/s | — | — | — |
-| DSI H200 4-GPUs | **31.5 GB/s** | 38.6 | 37.4 | **32.7** |
-| NVIDIA H100 4-GPUs | 44.7 GB/s | 41.8 | 43.6 | 44.3 |
+The averaged-over-all-transfers bandwidth (taken from total bytes ÷ total time across every H2D call recorded in the profile) tells a misleading story on its own:
+
+| Setup | All H2D (per GPU) — total GB ÷ total time | GPU0 | GPU1 | GPU2 | GPU3 |
+|---|---|---|---|---|---|
+| DSI H200 1-GPU | 41.6 GB/s | — | — | — | — |
+| DSI H200 4-GPUs | mean 35.1 GB/s | **31.5** | 38.6 | 37.4 | **32.7** |
+| NVIDIA H100 4-GPUs | mean 43.6 GB/s | 44.7 | 41.8 | 43.6 | 44.3 |
+
+These figures average together two very different regimes — 84 large pinned transfers per GPU (mean 165 MB, dominated by 12 transfers of ~991 MB and 12 of ~105 MB) and 2,845 small pageable transfers per GPU (averaging ~560 KB). Splitting by transfer size:
+
+| Transfer size class | DSI 1-GPU | DSI 4-GPU (per GPU) | NVIDIA H100 4-GPU (per GPU) |
+|---|---|---|---|
+| **>100 MB** (24/GPU, ~13 GB of data) | **55.4 GB/s** | **55.4 / 55.4 / 55.4 / 55.4** | **55.3 / 55.4 / 55.2 / 55.3** |
+| >10 MB (74/GPU, ~14 GB of data) | 49.9 GB/s | 43.5 / 48.8 / 48.4 / 44.9 | 50.8 / 49.7 / 50.3 / 50.0 |
+| All transfers (2929/GPU) | 41.6 GB/s | 31.5 / 38.6 / 37.4 / 32.7 | 44.7 / 41.8 / 43.6 / 44.3 |
+
+**Restricted to the production-sized weather tensors (>100 MB), DSI under 4-GPU concurrent load is identical to DSI single-GPU and identical to the H100 cluster — all four GPUs sustain ~55 GB/s with no degradation.** The PCIe bus has plenty of headroom for the dominant data path. The headline "DSI bandwidth drops 24% on GPU0/3" comes entirely from the small-transfer regime where each call is latency-bound (CPU-side dispatch, IRQ handling, kernel-lock contention), and four ranks competing for those host resources serialise them.
+
+The Midway Intel `bandwidth_test.py` numbers behave the same way: on the production-sized `upper_air_input` (22 MB) the concurrent-vs-sequential drop is only **−1.6% to −3.5%** on all four GPUs; the −55% aggregate figure quoted elsewhere in this report is dominated by the small `varying_boundary` tensor (1.3 MB) which collapses by −60%.
+
+**Implication.** This invalidates the earlier "PCIe contention is contributing to the 10–50 ms stalls" causal chain in the section above. The large-tensor H2D path on DSI is not bandwidth-limited under 4-GPU load — the 24% bimodal drop is a *small-transfer* effect, not a production-workload effect. The wall-time deficit on DSI vs NVIDIA is therefore almost entirely explained by the GPU0 dispatch gaps (and the corresponding gaps on GPU1–3), not by H2D throughput on the weather data.
+
+What remains worth investigating: the 2,845 small pageable transfers per GPU per profile *do* serialise badly under 4-GPU load, and if any of them sit on the critical path (e.g., a small parameter or index tensor that the next kernel waits for) they could be one mechanism contributing to the dispatch stalls. But this is a much narrower claim than "PCIe contention" and would require correlating individual MEMCPY events to subsequent kernel launches to confirm.
 
 ### NCCL is not the issue
 
-No NCCL collective kernels appeared in any of the three profiles. These are independent data-parallel inference runs — each GPU processes its own batch and there is no gradient synchronisation or inter-GPU communication at all.
+NCCL is NVIDIA's multi-GPU communication library — the layer PyTorch uses to synchronise gradients across GPUs during distributed training. No NCCL collective kernels appeared in any of the three profiles. These are independent data-parallel inference runs — each GPU processes its own batch and there is no gradient synchronisation or inter-GPU communication at all.
 
 ### Is pinned memory already in use?
 
-Checked the source memory kind recorded by CUPTI for every H2D transfer. All three runs show the same pattern: the large weather data tensors (~165 MB each, 84 transfers per GPU) go through **pinned** memory, while roughly 2,845 smaller transfers per GPU use **pageable** memory. The NVIDIA and DSI 4-GPU distributions are byte-for-byte identical, which means both clusters are running the same DataLoader configuration and `pin_memory` is already enabled for the main data path. The smaller pageable transfers are likely internal CUDA buffers or small parameter tensors, not the weather inputs.
+Checked the source memory kind recorded by CUPTI (CUDA's Profiling Tools Interface, the low-level event hook that `nsys` uses internally) for every H2D transfer. All three runs show the same pattern: 84 large weather-data tensors per GPU go through **pinned** memory (CPU RAM that the OS has been told not to page out to disk — this lets the GPU pull from it via direct memory access at full PCIe bandwidth). The 84 transfers are bimodal in size: per GPU per profile we see 12 transfers of ~991 MB, 12 of ~105 MB, 12 of ~22 MB, plus smaller, totalling 13.87 GB per GPU (mean per transfer 165 MB). Roughly 2,845 smaller transfers per GPU use **pageable** memory (ordinary CPU RAM, which the GPU has to copy via a slower bounce-buffer path) — totalling 1.60 GB per GPU. The NVIDIA and DSI 4-GPU distributions are byte-for-byte identical, which means both clusters are running the same DataLoader configuration and `pin_memory` is already enabled for the main data path. The smaller pageable transfers are likely internal CUDA buffers or small parameter tensors, not the weather inputs.
 
 ### What may? fix it
 
-The dispatch smoke test (see Midway cluster section below) measured sub-millisecond inter-step dispatch gaps on both Midway H200 nodes, which means Python overhead alone is not the bottleneck — the stalls are more likely a hardware topology or system configuration effect on DSI specifically. With that in mind:
+The dispatch smoke test (see Midway cluster section below) measured sub-millisecond inter-step dispatch gaps on both Midway H200 nodes under a synthetic workload. That test ran a model 4–6× slower than real Pangu, so it gives the CPU substantial slack between launches — it is an *upper bound* on Python overhead under generous CPU conditions, not a direct measurement under Pangu's tighter loop. With that caveat, it still rules out the extreme case (a Python loop that is fundamentally too slow on Midway); the stalls on DSI are most plausibly a hardware-topology or system-configuration effect specific to that node. With that in mind:
 
-**1. DataLoader prefetching.** Each torchrun rank already has `num_data_workers: 8` set in the config. The next step would be to confirm that `prefetch_factor` is set and that data is being pipelined onto the GPU asynchronously with `non_blocking=True`, so the next batch transfer overlaps with the current forward pass rather than starting after it.
-
-**2. NUMA binding.** If the DSI cluster has a multi-socket layout with GPUs split across NUMA nodes, binding each torchrun process to the CPU cores and memory local to its GPU would eliminate cross-socket dispatch latency. Running `nvidia-smi topo -m` and `numactl --hardware` on DSI would confirm whether this is the case (see hardware topology section below).
+**NUMA binding.** NUMA (Non-Uniform Memory Access) refers to multi-socket servers where each CPU has its own bank of RAM; accessing the "near" bank is fast, accessing the "far" bank pays a latency penalty. If the DSI cluster has a multi-socket layout with GPUs split across NUMA nodes, binding each `torchrun` process to the CPU cores and memory local to its GPU would eliminate cross-socket dispatch latency. Running `nvidia-smi topo -m` and `numactl --hardware` (`numactl` is the Linux tool for inspecting and controlling NUMA placement) on DSI would confirm whether this is the case (see hardware topology section below). The pinned-memory check above already ruled out the *DataLoader configuration itself* as the cause — both clusters allocate pinned buffers byte-for-byte identically — but the NUMA placement of those pinned buffers is a separate question that the memory-kind check does not address.
 
 The PCIe contentio?  Again unsure, a hardware topology constraint of the DSI node and cannot be fully worked around in software without knowing the actual node topology first.
 
@@ -311,56 +323,64 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 
 ### What we know so far across all measured configurations
 
+(Column key: **NVLink** = direct GPU-to-GPU electrical bus, much faster than PCIe; `NV6` means 6 NVLink bonds. **NUMA distance** = relative cost of cross-socket memory access, where 10 is local and higher is "farther". **Concurrent bandwidth drop** = how much each GPU's H2D bandwidth degrades when all four GPUs transfer simultaneously vs one at a time.)
+
 | Cluster | GPU | CPU | NVLink | NUMA nodes | NUMA distance | CPU→GPU bandwidth (single GPU) | Concurrent bandwidth drop | Python dispatch gap | GPU util (4-GPU) | Gaps >10ms | Kernel data |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| NVIDIA cluster | H100 NVL | — | unknown¹ | — | — | 42–45 GB/s² | ~0%² | — | 37–57% | 27 | ✓ |
-| DSI | H200 | unknown | unknown | unknown | unknown | 41.6 GB/s² | 20–25% (asymmetric)² | — | 15–23% | 423 | ✓ |
-| Midway Intel | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 21 | 26–52 GB/s³ | 10–17% | 0.018 ms⁴ | n/a⁵ | n/a⁵ | ✗⁵ |
-| Midway AMD | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 32 | 35–54 GB/s³ | ~0%⁶ | 0.012 ms⁴ | n/a⁵ | n/a⁵ | ✗⁵ |
+| NVIDIA cluster | H100 NVL | — | unknown¹ | — | — | 42–45 GB/s² | ~0%² | — | 37–57% | 27 (GPU0) | ✓ |
+| DSI | H200 | unknown | unknown | unknown | unknown | 41.6 GB/s² | **>100 MB: ~0% (all GPUs flat at 55 GB/s)**; all transfers avg: GPU0/3 −21/-24%, GPU1/2 −7/-10%² | — | 15–23% | 423 (GPU0); 649–894 (GPU1–3) | ✓ |
+| Midway Intel (test) | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 21 | 44–46 GB/s aggregate, symmetric across GPUs³ | **22 MB upper_air: −2 to −4%**; 1–4 MB latency-bound: −55 to −60%³ | 0.018 ms⁴ | unavailable⁵ | unavailable⁵ | partial⁵ |
+| Midway AMD (test) | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 32 | NUMA-aligned: GPU0/1 ≈ 39 GB/s, GPU2/3 ≈ 49 GB/s³ | ~0% additional concurrent drop⁶ | 0.012 ms⁴ | unavailable⁵ | unavailable⁵ | partial⁵ |
+| Midway pedramh-gpu | H100 NVL | Xeon Gold 6346 (Ice Lake) | NV12 within pairs only⁸ | 2 (GPU0/1 vs GPU2/3)⁸ | 20 | ~27 GB/s (PCIe Gen4 limit)⁸ | NUMA-aligned: GPU2/3 −42% on H2D, GPU0/1 −48% on D2H⁸ | pending⁹ | pending⁹ | pending⁹ | pending⁹ |
 
 ¹ We never ran the GPU interconnect topology check on the NVIDIA cluster, so we don't know if its H100 NVL cards use NVLink or not.
 
-² The NVIDIA and DSI bandwidth numbers were measured during actual inference (large ~165 MB data tensors moving to the GPU each step). The Midway bandwidth numbers were from a dedicated test that used much smaller tensors (max 14 MB). The absolute GB/s numbers are not directly comparable between clusters — what matters is the relative drop when all 4 GPUs transfer at the same time versus one at a time.
+² The NVIDIA and DSI bandwidth numbers are from actual inference (`nsys` MEMCPY records). The 84 pinned per-GPU transfers per profile are bimodal: 12 of ~991 MB, 12 of ~105 MB, 12 of ~22 MB, plus smaller (mean 165 MB). The Midway bandwidth numbers are from a dedicated test (`v2.0/test/bandwidth_test.py`) that uses tensor shapes derived from `exp2.yaml`: H2D `upper_air_input` = 22.3 MB, `surf_input` = 1.3 MB, `varying_boundary` = 3.9 MB; D2H (device-to-host: GPU memory → CPU memory, the reverse direction) stacked outputs up to 356.5 MB. The H2D upper-air size is within ~25% of the production figure derived from `exp2.yaml` at batch=2/GPU, so the *relative* drop comparison across clusters is broadly meaningful, but the absolute GB/s numbers should not be compared one-to-one because the test sizes and the production sizes are not identical and the software stacks differ.
 
-³ On both Midway nodes, GPU0 was noticeably slower than the other three GPUs even when tested alone with no other GPUs active. On Intel, GPU0 reached 27 GB/s for large transfers while GPU1–3 reached 52 GB/s. On AMD the gap was smaller. The cause is unclear — one possibility is that GPU0's physical slot on the server motherboard shares a data pathway with a network card, adding interference. This is unconfirmed and would require inspecting the server's physical wiring diagram.
+³ On Midway Intel the four GPUs are essentially symmetric in sequential H2D (53.8 / 53.8 / 53.6 / 53.6 GB/s on the 22 MB `upper_air_input`; 18.8 / 18.9 / 18.4 / 18.3 GB/s on the 1.3 MB `surf_input` which is latency-dominated). Under concurrent 4-GPU load, the production-sized `upper_air_input` (22 MB) drops only −1.6 to −3.5% across the four GPUs; the `varying_boundary` tensor (3.9 MB, latency-bound regime) drops −57 to −62%; the small `surf_input` (1.3 MB) drops −10 to −22%. The "aggregate median" headline of −54 to −61% (footnote 6) is dominated by the small-tensor regime and does not reflect the production data path. On Midway AMD, sequential H2D shows a clean ~20% NUMA-aligned split: aggregate medians are 39.4 / 39.2 / 48.7 / 48.7 GB/s for GPU0/1/2/3 respectively. The split matches the CPU-affinity boundary from the topology matrix (GPU0/1 on cores 0-31, NUMA node 0; GPU2/3 on cores 32-63, NUMA node 1), consistent with the AMD allocator placing pinned host buffers preferentially on one NUMA node.
 
-⁴ This was measured on a single GPU running a synthetic model that was 6× slower per step than real Pangu. The GPU sat idle for 0.018 ms (Intel) or 0.012 ms (AMD) between steps — far below the 10–50 ms gaps seen on DSI. Notably, the CUDA Graph approach was 2–3× *slower* than the standard Python loop (0.046 ms vs 0.018 ms Intel), because it still has to copy new input data into fixed memory buffers before each replay. This test only covers single-GPU behaviour and does not reproduce the 4-GPU setup where DSI's gaps appear.
+⁴ This was measured on a single GPU running a synthetic model that was 4-6× *slower* per step than real Pangu (forward time 87.8 ms on Intel, 55.2 ms on AMD, vs ~14 ms for Pangu). At these step times the CPU has substantial slack between launches, so the measured 0.018/0.012 ms inter-step gap is an upper bound on Python overhead under generous CPU conditions, not a direct measurement of overhead under Pangu's tighter loop. Notably, the CUDA Graph approach was 2-3× *slower* than the standard Python loop (0.046 ms vs 0.018 ms Intel), because it still has to copy new input data into fixed memory buffers before each replay. This test only covers single-GPU behaviour and does not reproduce the 4-GPU setup where DSI's gaps appear.
 
-⁵ A security restriction on Midway's test partition prevented the profiler from attaching to the GPU worker processes (of which there are 4, one per GPU). All the GPU timing data for Midway H200 therefore comes from the bandwidth test and dispatch smoke test above, not from a full inference profile.
+⁵ Both Midway H200 4-GPU `nsys` captures completed and produced sqlite files (`test_partition_benchmarks/midway_h200_intel_4gpus_inference.sqlite`, 99 MB; `midway_h200_amd_4gpus_inference.sqlite`, 88 MB), but the `CUPTI_ACTIVITY_KIND_KERNEL` table is missing from both — the test partition's security policy blocks the profiler's kernel-tracing channel (the profiler attaches to user processes via the Linux `ptrace` syscall, which is restricted on shared partitions) even when `nsys` itself runs to completion. MEMCPY and SYNCHRONIZATION events are present. AMD's MEMCPY table is also missing GPU0 entirely (only deviceIds 1–3 are recorded). The capture window is much shorter than the DSI profiles (490 H2D transfers per GPU vs 2,929 on DSI), so the runs did not cover the same number of inference iterations. Per-GPU concurrent H2D bandwidth under real inference (limited to transfers >1 MB) from these captures is: Intel GPU0/1/2/3 = 10.7 / 12.5 / 13.6 / 13.3 GB/s; AMD GPU1/2/3 = 41.4 / 41.3 / 42.6 GB/s. Gap-distribution and kernel-mix analysis is not possible without the kernel table.
 
-⁶ When all 4 AMD GPUs transferred data simultaneously, throughput barely changed compared to one GPU at a time (less than 2% difference). For the Intel node the drop was 10–17%. However, for the largest individual tensor on AMD the concurrent run was sometimes slightly *faster* than the sequential run, which is more consistent with measurement noise than a real architectural improvement. The "zero contention" result should be taken as "no meaningful contention detected" rather than a precise measurement.
+⁶ Contention deltas (concurrent − sequential) on Midway, from `bandwidth_test.py` aggregate medians: Intel GPU0/1/2/3 = −55.6 / −54.3 / −61.3 / −55.2% (a uniform ~55% collapse across all four GPUs); AMD GPU0/1/2/3 = +0.5 / +24.4 / −0.0 / +0.0% (concurrent ≈ sequential on three GPUs; the +24.4% on GPU1 comes from the `upper_air_input` figure jumping from 43.75 to 54.93 GB/s, which is more consistent with measurement noise than a real architectural improvement). For AMD the "no degradation" result should be taken as "no meaningful *additional* contention detected on top of the sequential NUMA asymmetry already documented in footnote 3" rather than a precise measurement of perfect isolation.
 
 ⁷ The server topology report suggested GPU0 and GPU1 share one CPU socket (cores 0–23 on Intel, 0–31 on AMD) while GPU2 and GPU3 share the other socket (cores 24–47 / 32–63). However, the GPU-side confirmation field in the report was blank on both nodes, so this is an inference from the CPU affinity hints rather than a direct readout.
 
+⁸ pedramh-gpu (`midway3-0423`) is **H100 NVL on Xeon Gold 6346 (Ice Lake)** — i.e., the same GPU model as the NVIDIA cluster, but a Midway host. From `test_partition_benchmarks/midway_bandwidth_midway_bandwidth_test.sh_49972059.out` and `test_partition_benchmarks/pedramh_hw_topo.out`: 2 sockets × 16 cores (NUMA distance 10/20), driver 535.216.03, CUDA 12.2. NVLink topology is **NV12 within socket-pairs only** (GPU0↔GPU1 = NV12, GPU2↔GPU3 = NV12, but {GPU0,1} ↔ {GPU2,3} = `SYS`/cross-socket UPI, no NVLink) — fundamentally different from Midway H200's NV6 full mesh. Ice Lake is PCIe Gen4 only, so the H100 NVL bandwidth ceiling here is ~32 GB/s rather than the ~64 GB/s achievable on Gen5 hosts; the 27 GB/s sequential figure is ~84% of Gen4 theoretical and is comparable in *fraction of available bandwidth* to Midway H200's 53 GB/s out of Gen5's 64 GB/s. Under concurrent 4-GPU load, H2D shows a NUMA-aligned drop: GPU0/1 hold ~27 GB/s while GPU2/3 collapse to ~14 GB/s (−42%). On D2H the asymmetry inverts (GPU0/1 collapse, GPU2/3 hold) — consistent with the dataloader pinning host buffers on one NUMA node for input and the destination buffers on another for output.
+
+⁹ Dispatch-gap, GPU-utilisation, and kernel-mix figures for pedramh-gpu will be filled in once `v2.0/HPC_scripts/midway_infer_nsys.sh` is submitted and the resulting `midway_h100_4gpus_inference.{nsys-rep,sqlite}` is run through `verify_bench.py`. This will give a direct H100-NVL-on-Midway-host vs H100-NVL-on-NVIDIA-cluster comparison, the cleanest test for whether the DSI dispatch latency is host-environment-specific or GPU-architecture-specific.
+
 ### Key findings from the Midway benchmarks
 
-**H200 on Midway has NVLink (NV6 full mesh).** All four H200s on the Intel node are connected to each other with 6 NVLink bonds each — the same topology class as H100 NVL. This rules out PCIe-only topology as the explanation for Midway's H200 behaviour. Whether the DSI node also has NVLink is still unknown; `nvidia-smi topo -m` on the DSI node would answer this immediately.
+**H200 on Midway has NVLink (NV6 full mesh).** All four H200s on both Intel and AMD nodes are connected to each other with 6 NVLink bonds each. This is *not* the same as the typical dual-socket H100 NVL board topology: pedramh-gpu's H100 NVL (see footnote 8) shows NV12 within socket-pairs only, with cross-socket `SYS` between the pairs. So the H200 boards on Midway are wired more aggressively than the H100 NVL boards on the same campus. That said, NVLink topology does **not** address H2D bandwidth — data still moves from CPU memory over PCIe to reach the GPU, and NVLink does not bypass that path. So the NV6 finding is irrelevant to the H2D contention story below. Whether the DSI node also has NVLink is still unknown; `nvidia-smi topo -m` on the DSI node would answer this immediately.
 
-**Asymmetric H2D bandwidth appears on both Midway and DSI, suggesting a topology pattern rather than a DSI-specific fault.** On Midway Intel H200, GPU0 gets roughly half the H2D bandwidth of GPU1–3 for large tensors even in the sequential test where only one GPU is active at a time (no contention possible). DSI showed a different but related asymmetry — GPU0 and GPU3 dropped to 31–33 GB/s under concurrent load while GPU1 and GPU2 stayed near 38 GB/s.
+**pedramh-gpu H100 NVL is the cleanest comparison point we have for DSI's host environment.** It's the same GPU model as the NVIDIA cluster but a different host (Ice Lake Xeon, 16 cores per socket, PCIe Gen4, CUDA 12.2 driver 535). Its bandwidth pattern (NUMA-aligned drop under concurrent load) is much closer to Midway AMD H200 than to the NVIDIA cluster's flat H100 NVL profile — which suggests the NVIDIA cluster host is doing something specific (NUMA-aware allocator placement, dedicated PCIe routing, or single-socket layout) that ordinary dual-socket H100 NVL hosts don't. Submitting `v2.0/HPC_scripts/midway_infer_nsys.sh` will give us a full 4-GPU H100 NVL inference profile on this host with kernel timing (pedramh-gpu doesn't have the test partition's ptrace restriction). Comparing it head-to-head with the NVIDIA cluster profile isolates the *host* contribution from the *GPU* contribution.
 
-To understand why, it helps to know what NUMA means in this context. A dual-socket server has two CPU chips, each with its own pool of local RAM. A GPU copies data from CPU RAM across the PCIe bus. If the GPU is on the "near" CPU socket — the one that owns the RAM being read — the transfer is fast. If it is on the "far" socket, the data first has to cross an inter-socket link (Intel's UPI) before reaching PCIe, which adds latency and reduces bandwidth. This penalty is the NUMA effect.
+**Midway Intel: symmetric across GPUs, and large-tensor concurrent bandwidth is essentially unaffected.** All four Intel GPUs deliver essentially identical sequential H2D bandwidth (53.8 / 53.8 / 53.6 / 53.6 GB/s on the 22 MB `upper_air_input`). Under simultaneous load from all four GPUs the large-tensor bandwidth holds: GPU0/1/2/3 drop by only −1.6 to −3.5% on `upper_air_input`. The "−55% concurrent collapse" figure that appears in the aggregate-median row of the bandwidth_test output is dominated by the small `varying_boundary` (3.9 MB) and `surf_input` (1.3 MB) tensors, which are latency-bound: at those sizes, four concurrent processes contending for host-side dispatch / kernel locks / IRQ paths serialise badly, but it does not reflect contention on the bus itself. Earlier drafts of this report claimed Intel GPU0 was "half the bandwidth of GPU1-3"; that claim was a measurement-script confusion and is not present in the raw data.
 
-On Midway the topology output (`nvidia-smi topo -m`) showed:
+**Midway AMD: NUMA-aligned 20% sequential asymmetry, ~0% additional concurrent degradation.** On the AMD node, sequential H2D splits cleanly along the NUMA boundary: GPU0/1 (cores 0–31, NUMA node 0) at ~39 GB/s vs GPU2/3 (cores 32–63, NUMA node 1) at ~49 GB/s (aggregate medians). Under concurrent load all four GPUs hold their sequential numbers within ±0.5%, except for an unexplained +24% jump on GPU1's `upper_air_input` measurement (43.75 → 54.93 GB/s) that is more consistent with measurement noise than a real architectural gain.
+
+To understand the NUMA effect: a dual-socket server has two CPU chips, each with its own pool of local RAM. A GPU copies data from CPU RAM across the PCIe bus. If the GPU is on the "near" CPU socket — the one that owns the RAM being read — the transfer is fast. If it is on the "far" socket, the data first has to cross an inter-socket link (Intel's UPI or AMD's Infinity Fabric) before reaching PCIe, which adds latency and reduces bandwidth. The Midway topology output (`nvidia-smi topo -m`) showed:
+
 - GPU0 and GPU1 have CPU affinity 0–23 (Intel) / 0–31 (AMD), suggesting NUMA node 0
 - GPU2 and GPU3 have CPU affinity 24–47 (Intel) / 32–63 (AMD), suggesting NUMA node 1
 - Cross-socket distance is 2.1× worse than local on Intel (21 vs 10) and 3.2× on AMD (32 vs 10)
 - Note: the `GPU NUMA ID` field was `N/A` on both nodes, so the GPU-side NUMA assignment was not directly confirmed by the hardware report
 
-Despite GPU0 and GPU1 being on the same NUMA node, GPU0 was anomalously slow even in isolation — half the bandwidth of GPU1. This does not fit a simple two-socket NUMA explanation and may instead reflect a PCIe switch topology difference at the slot level (GPU0 could be on a PCIe switch that also hosts a NIC, competing for the same upstream lanes). The bandwidth test alone cannot distinguish these causes; `lspci -tv` or a PCIe topology diagram of the server would.
+The AMD pattern is consistent with the dataloader allocating pinned buffers preferentially on one NUMA node — GPUs on the same node see local memory, GPUs on the other node pay the cross-socket cost. The Intel node does not show this split in our measurements, which may reflect either a different allocator placement on the Intel host, a faster cross-socket fabric, or a measurement that simply did not exercise the imbalance. Without explicit `numactl --membind` testing we cannot distinguish these. AMD's symmetry under concurrent load (no further degradation on top of the sequential split) is consistent with sufficient per-GPU PCIe bandwidth headroom on EPYC-9335, but with only one node measured per CPU family we cannot generalise this to a property of "AMD PCIe architecture" — it could equally reflect this specific board's slot wiring, driver version, or BIOS configuration.
 
-The DSI pattern (GPU0 and GPU3 slow, GPU1 and GPU2 less affected) is more consistent with a clean NUMA split where GPU0 and GPU3 are on the socket that is remote from where the DataLoader is allocating memory. Without `nvidia-smi topo -m` from DSI we cannot confirm this, but the two-GPU asymmetry points to a hardware path difference rather than a random or code-level effect.
-
-**AMD EPYC shows essentially zero concurrent bandwidth degradation.** On the AMD node, all four GPUs maintain their sequential bandwidth under 4-GPU concurrent load (−0.1% to +1.8%). This is strikingly different from the Intel node (10–17% drop) and from DSI (20–25% asymmetric drop). Despite the AMD EPYC-9335 having a higher cross-NUMA distance (32) than Intel (21), its PCIe architecture appears to provide more isolated bandwidth paths per GPU. This suggests the concurrent bandwidth drop on DSI is a PCIe topology issue specific to the node, not a fundamental H200 characteristic.
+**DSI's averaged bandwidth pattern matches no other host we've measured — but only in the small-transfer regime.** DSI's *averaged-over-all-transfers* concurrent H2D drops are GPU0 = −24.3%, GPU1 = −7.2%, GPU2 = −10.1%, GPU3 = −21.4% — slow on GPU0 and GPU3, less affected on GPU1 and GPU2. This bimodal pair-split is not the NUMA {0,1}-vs-{2,3} split seen on AMD H200 or on pedramh-gpu H100 NVL, nor the symmetric-on-large-tensors pattern seen on Intel H200. A {0,3} split would fit a topology like a PCIe-switch grouping where one switch holds {0,2} and another {1,3} on opposite sockets, or a non-standard slot wiring — but pinning this down requires `nvidia-smi topo -m` from DSI. However, restricting to the >100 MB transfers that constitute the production weather-data path, **all four DSI GPUs sustain 55.4 GB/s under 4-GPU concurrent load — identical to single-GPU DSI and identical to the H100 cluster**. So the bimodal asymmetry exists only for small transfers, not for the dominant data path. This is consistent with a small-transfer / host-dispatch contention story rather than a bus-level PCIe topology problem. Without `nvidia-smi topo -m` from DSI we still cannot fully characterise the hardware layout, but the bandwidth observations no longer require a topology explanation for the production workload.
 
 **What we can and cannot compare between Midway and DSI.**
 
-The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`) ran on a **single GPU** on both Midway H200 nodes and measured the GPU idle time between consecutive forward passes using a synthetic model. The median inter-step gap was 0.018 ms on Intel and 0.012 ms on AMD — both far below 10 ms. This rules out Python-level dispatch as the cause of DSI's gaps in single-GPU conditions.
+The dispatch smoke test (`v2.0/test/inference_dispatch_smoke.py`) ran on a **single GPU** on both Midway H200 nodes and measured the GPU idle time between consecutive forward passes using a synthetic model. The median inter-step gap was 0.018 ms on Intel and 0.012 ms on AMD — both far below 10 ms. This is an *upper bound* on Python overhead when work is plentiful (the synthetic forward took 55–88 ms, 4–6× longer than real Pangu, which gives the CPU substantial slack to prepare the next launch); it does not directly measure overhead under Pangu's tighter inner loop. With that caveat, the result still shows the dispatch path on Midway H200 is not pathologically slow in the way DSI's is at the single-GPU level.
 
-However, the ptrace restriction on the test partition prevented nsys from capturing kernel activity in the 4-GPU runs on Midway H200. **We have no multi-GPU dispatch comparison for Midway H200**, so we cannot say whether 4 processes running concurrently on a Midway H200 node would produce the same gap explosion seen on DSI (41 → 423 gaps from 1 to 4 GPUs).
+The Midway 4-GPU nsys captures completed and contain MEMCPY and SYNCHRONIZATION events, but the `CUPTI_ACTIVITY_KIND_KERNEL` table is missing from both — the test partition's ptrace restriction blocks CUPTI's kernel-tracing channel even when nsys itself runs to completion. AMD's MEMCPY also dropped GPU0 entirely (only deviceIds 1–3 are recorded). The capture window is much shorter than DSI's (490 vs 2,929 H2D transfers per GPU). Given these limitations: we **can** report per-GPU concurrent H2D bandwidth on Midway under real inference (Intel ~11–14 GB/s, AMD ~41–43 GB/s — both well below the sequential test numbers), but we **cannot** reproduce DSI's gap-distribution analysis on Midway H200 from these files.
 
-What makes the single-GPU comparison meaningful is the DSI 1-GPU profile: even on **one GPU with no inter-process competition**, DSI already shows **41 gaps of 10–50 ms** and only 39% GPU utilisation. Something about DSI's single-GPU environment already causes elevated dispatch latency. The 4-GPU case makes it roughly 10× worse (423 gaps), but the problem is present before any multi-GPU effects are introduced. The Midway H200 single-GPU dispatch test shows no such elevated latency, which suggests the elevated baseline is DSI-specific rather than a property of H200 hardware in general.
+What makes the single-GPU comparison meaningful is the DSI 1-GPU profile: even on **one GPU with no inter-process competition**, DSI already shows **41 gaps of 10–50 ms** and only 39% GPU utilisation. Something about DSI's single-GPU environment already causes elevated dispatch latency relative to Midway H200's single-GPU dispatch test. The 4-GPU case makes it roughly 10× worse (423 gaps on GPU0; 649–894 on GPU1–3), but the elevated baseline is present before any multi-GPU effects are added. So the framing is: DSI's *dispatch-latency pattern* is distinct from what Midway H200 shows in single-GPU dispatch — though the comparison only covers the dispatch path itself, not whatever host-side contention 4 co-resident processes add on top.
 
-To complete the comparison properly — to check whether Midway H200 under 4-GPU DDP would reproduce the same pattern as DSI — we need either the ptrace restriction lifted on the test partition or the same inference nsys profile run on the `pedramh-gpu` H100 partition (which has different security settings).
+To complete a like-for-like multi-GPU comparison we would need either the ptrace restriction lifted on the test partition (giving us kernel timing on Midway 4-GPU) or the same inference nsys profile run on the `pedramh-gpu` H100 partition (which has different security settings).
 
 ### What is still unknown
 
@@ -377,19 +397,28 @@ If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6
 
 ## Summary of DSI investigation as of 2026-05-21
 
-**The main problem.** The DSI cluster's H200 GPUs spend most of their time sitting idle rather than running the model. The actual forecast computation takes about the same time on DSI as on the NVIDIA cluster — the H200 is not slower at the work itself — but the GPUs keep stopping and waiting for 10–50 ms between each step of the forecast loop, hundreds of times per run. The NVIDIA cluster barely does this at all.
+**The main problem.** The DSI cluster's H200 GPUs spend most of their time sitting idle rather than running the model. Three facts now bound the explanation: (1) the actual forecast computation takes about the same time per GPU on DSI as on the NVIDIA cluster (within ~10%), so the H200 is doing the work at a similar rate to the H100; (2) the dominant data path — the large weather-data tensors moving from CPU to GPU — sustains ~55 GB/s on both clusters under 4-GPU load, so the PCIe bus is not the bottleneck for the production workload; (3) the GPUs nevertheless keep stopping and waiting for 10–50 ms between consecutive bursts of work, hundreds of times per run, and the NVIDIA cluster barely does this at all. The wall-time deficit is therefore almost entirely **dispatch latency** — the CPU not handing the next batch of work to the GPU fast enough — rather than compute or bandwidth.
 
-**What was ruled out.** Both clusters ran the exact same code. A timing test on Midway's H200 machines showed that the gaps between steps in the Python loop are under a tenth of a millisecond — so the pauses on DSI are not coming from the software, they are coming from something about the machine itself. We also confirmed that adding more data loading workers would not help, because the data loading pipeline is not serialised across the four GPUs — each GPU already has its own independent loader.
+**What was ruled out.** Both clusters ran the same code (with the caveat that the software stack — CUDA, cuDNN, nsys version — was not held strictly constant between the bare-metal DSI host and the NGC apptainer used on NVIDIA). A dispatch timing test on Midway's H200 machines showed the gaps between steps in a Python loop are under a tenth of a millisecond when the model is 4–6× slower than Pangu — an upper bound on Python overhead under generous CPU conditions rather than a direct measurement under Pangu's tighter loop, but enough to rule out a fundamentally too-slow Python loop as the cause. We also confirmed that adding more data loading workers would not help, because the data loading pipeline is not serialised across the four GPUs — each GPU already has its own independent loader, and the pinned-memory configuration matches NVIDIA's byte-for-byte.
 
-**What the Midway tests showed.** Midway has two types of H200 nodes — Intel CPU and AMD CPU. Both have direct high-speed connections between the four GPUs. The Intel node shows a ~3% slowdown when all four GPUs load data at the same time; the AMD node shows essentially no slowdown. A timing test on a single Midway H200 GPU showed the Python loop adds under a millisecond between forecast steps when running a synthetic model — but this is not directly comparable to DSI because the synthetic test has no data loading or file saving.  **However, a data loader is not the problem as the gaps appear somewhere during model inference it self.**   We were also unable to record full hardware timelines on Midway H200 under a real four-GPU run due to no gpu-profiling available, so we cannot say whether DSI's pauses would appear there too. 
+**What the Midway tests showed.** Midway has two types of H200 nodes — Intel CPU and AMD CPU. Both have direct high-speed connections between the four GPUs. On the **production-sized weather tensors** (~22 MB each per H2D call, ~165 MB averaged across the larger pinned transfers), the Intel node delivers identical bandwidth on all four GPUs whether they pull data one at a time or all at once — only −2 to −4% degradation under simultaneous load. The headline "loses about half its bandwidth" figure that appeared in earlier drafts came from averaging in smaller (1–4 MB) tensors that are latency-dominated rather than bandwidth-dominated; on those the four ranks compete for host-side dispatch and serialise badly, but that does not reflect a problem with the PCIe bus itself. The AMD node shows a ~20% sequential speed difference between the four GPUs even when only one is active — GPUs 0 and 1 are slower than GPUs 2 and 3 because they read from a different bank of CPU memory — but does not slow down further under simultaneous load. **The same correction applies to DSI**: when restricted to the production-sized transfers, all four DSI GPUs sustain ~55 GB/s under 4-GPU load, identical to single-GPU DSI and identical to the NVIDIA H100 cluster. The bimodal "−24% on GPU0/3" figure quoted earlier in this report is the all-transfers average and is dominated by the same small-transfer / host-dispatch contention seen on Intel. A timing test on a single Midway H200 GPU showed the Python loop adds under a millisecond between forecast steps when running a synthetic stand-in model — but the stand-in is 4–6× slower per step than real Pangu, so this is an upper bound on Python overhead under generous CPU conditions, not a direct measurement at Pangu's actual step time.  **However, a data loader is not the problem as the gaps appear somewhere during model inference it self.** We collected the four-GPU hardware timelines on both Midway H200 nodes, but they are missing the on-GPU kernel records (the test partition's security policy blocks the profiler's kernel-tracing channel), so we have data-transfer numbers from the real four-GPU run but cannot reproduce DSI's gap analysis on Midway. 
 
-**What still needs to be learned.** We do not know the specifics of the DSI machine's hardware — which GPUs are connected to which CPU socket, whether there is high-speed GPU-to-GPU interconnect, and how the system assigns work to CPU cores. Two commands run on the DSI machine would answer most of these questions in seconds (`nvidia-smi topo -m` and `numactl --hardware`). We also do not yet have a full hardware timeline from Midway's pedramh-gpu partition, which would give the cleanest direct comparison against DSI.
+**What still needs to be learned.** We do not know the specifics of the DSI machine's hardware — which GPUs are connected to which CPU socket, whether there is high-speed GPU-to-GPU interconnect, and how the system assigns work to CPU cores. Two commands run on the DSI machine would answer most of these questions in seconds (`nvidia-smi topo -m` and `numactl --hardware`). The pedramh-gpu hardware topology is now known (see footnote 8) — what remains for that node is the full 4-GPU inference profile (queued: `v2.0/HPC_scripts/midway_infer_nsys.sh`). Once that lands, plus the two real-Pangu dispatch tests on the H200 test partition (`midway_dispatch_real_intel.sh`, `midway_dispatch_real_amd.sh`), we will have three independent data points that should disambiguate "H100 vs H200 architectural difference" from "DSI host-environment configuration".
 
 ---
 
 ## Notes on measurement reliability
 
-- All step times are measured with graphics card synchronisation barriers (`torch.cuda.synchronize()`) on both sides of the timing window. This ensures we record actual execution time, not just how long it takes to submit work to the graphics card.
+- All step times are measured with GPU synchronisation barriers (`torch.cuda.synchronize()`) on both sides of the timing window. This ensures we record actual execution time, not just how long it takes to submit work to the GPU.
 - The warm-up period (20 steps) absorbs one-time costs: driver initialisation, automatic kernel selection (cuDNN autotuning), and communication library warm-up.
 - The timer includes a self-consistency check: the sum of individually measured step windows must agree with the total elapsed wall time within 10%. If they disagree, the result is discarded rather than recorded.
+
+### Cross-cluster comparison caveats
+
+The DSI, NVIDIA, and Midway inference profiles compared in the sections above were collected with non-identical conditions. Specifically:
+
+- **No warmup before profiling.** `v2.0/inference_optimized.py` starts capturing from the first iteration (`if i > 5: break`), so first-batch costs — cuDNN autotune, cuBLAS workspace init, pinned-buffer first allocation — are folded into every profile and contribute to the >500 ms gap bucket.
+- **Software stack not held constant.** NVIDIA runs inside the NGC apptainer; DSI is bare-metal; Midway is bare-metal under a different driver/OS. CUDA, cuDNN, and nsys versions were not recorded per cluster.
+- **Git SHA of `inference_optimized.py` not recorded** per cluster. Confirm the same file ran by computing the SHA before each capture if reproducing.
+- **The verification script** `verify_bench.py` (at repo root) reproduces every numerical claim above from the .sqlite profiles; re-run it after any rebuild to confirm the numbers still hold.
 
