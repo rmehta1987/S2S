@@ -422,11 +422,11 @@ Maximum gap across all 2,360 measurements on Midway: **66 microseconds**. The sm
 
 **What this finding rules out (decisively, on Midway evidence alone):**
 
-- **The H200 architecture as a cause** of the DSI handoff latency. The same GPU on a different host shows no such latency.
+- **The H200 chip itself as the sole cause.** The same GPU model on a different host (Midway) ran the identical workload and produced no gaps over 10 ms. So the H200 on its own, with a standard software setup, does not produce this latency. What this does *not* rule out is the H200 combined with something specific to DSI — for example, a different version of the small firmware baked into the GPU, a different variant of the H200 board, or a power-saving setting on the GPU's connection to the CPU that only misbehaves in DSI's particular host environment. One additional `nvidia-smi` query on the DSI node would confirm that the GPU model and firmware match Midway's; we have added it to the diagnostic block below.
 - **4-rank `torchrun` as an inherent producer** of the gaps. Midway runs 4 ranks the same way as DSI and sees zero.
-- **NUMA mis-binding *alone*** as sufficient to cause the gaps. Midway has GPUs split across 2 NUMA nodes, no explicit `numactl --membind` was done, and the test still produces zero gaps. NUMA misplacement of pinned buffers is therefore not the entire mechanism on DSI; if it contributes there, it does so in combination with another factor.
-- **Deep CPU C-states** as the mechanism on Midway. The Midway `intel_idle` driver is restricted to C1/C2 with a 41 μs maximum exit latency — three orders of magnitude too small to produce 10-50 ms gaps.
-- **The model itself** (random-weight init with real architecture and production tensor shapes is enough to surface the gaps — they would have appeared here if they were intrinsic to the model's kernel pattern).
+- **GPUs reading data from the "wrong" CPU memory bank** as enough on its own to cause the gaps. Modern servers have two CPU chips, each with its own bank of RAM; if a GPU has to pull input from the *far* bank, the transfer takes longer (this is called the NUMA effect). Midway's GPUs are split across both memory banks, no special steering was done to keep each GPU on its local bank, and the test still produced no gaps. So this kind of mis-placement by itself is not enough to explain the 10-50 ms gaps; if it contributes on DSI, it would have to be in combination with another factor.
+- **Deep CPU sleep states** as the mechanism on Midway. When a CPU is idle, Linux can put it into progressively deeper power-saving states; the deeper the state, the longer it takes the CPU to wake up and handle the next piece of work. Midway's hosts only allow the two shallowest sleep states, which wake the CPU in 41 microseconds at most — three orders of magnitude faster than the 10-50 ms gaps we are trying to explain. So on Midway specifically, deep idle states are not the mechanism. DSI may differ here, which is why the diagnostic block below includes a check for it.
+- **Something inherent to how PanguModel_Plasim schedules GPU work.** The Midway test ran the actual model architecture with production tensor shapes (only the trained weights were random, since the GPU command pattern does not depend on the values inside the weights). If the gaps were caused by the model's own pattern of kernel launches — for example, a particular sequence of small kernels that has to serialise on the CPU side — they would have shown up on Midway too. They did not.
 
 **What this finding does *not* rule out**, and which remain candidates for the DSI-specific cause:
 
@@ -443,6 +443,7 @@ Maximum gap across all 2,360 measurements on Midway: **66 microseconds**. The sm
 ```bash
 nvidia-smi | head -3                                            # driver + driver-CUDA version
 nvidia-smi --query-gpu=driver_version --format=csv
+nvidia-smi --query-gpu=name,vbios_version --format=csv          # exact H200 variant + GPU firmware
 python -c "import torch; print(torch.__version__, torch.version.cuda)"
 nvidia-smi topo -m
 numactl --hardware
@@ -465,16 +466,39 @@ What makes the single-GPU comparison meaningful is the DSI 1-GPU profile: even o
 
 To complete a like-for-like multi-GPU comparison we would need either the ptrace restriction lifted on the test partition (giving us kernel timing on Midway 4-GPU) or the same inference nsys profile run on the `pedramh-gpu` H100 partition (which has different security settings).
 
-### What is still unknown
+### What is still unknown — and the hardware diagnostic to request from DSI
 
-The critical missing piece is DSI's hardware topology. Running two commands on the DSI node would resolve the main open questions:
+The largest remaining unknown is the DSI node's host configuration. A short script that someone on the DSI team can run on the node — taking under a minute, requiring nothing beyond a normal user account — would answer most of the remaining candidate causes. None of these commands modify anything; they only read system state. Commands are grouped by what they tell us:
 
 ```bash
-nvidia-smi topo -m     # shows NVLink vs PCIe, GPU-to-NUMA mapping
-numactl --hardware     # shows NUMA node count and distances
+# --- GPU identity (≈5 seconds) ---
+nvidia-smi | head -3                                             # driver version + driver-supported CUDA version
+nvidia-smi --query-gpu=driver_version --format=csv               # machine-readable driver version
+nvidia-smi --query-gpu=name,vbios_version --format=csv           # exact H200 board variant + GPU firmware
+nvidia-smi topo -m                                               # GPU-to-GPU links (NVLink vs PCIe) + CPU/NUMA affinity per GPU
+python -c "import torch; print(torch.__version__, torch.version.cuda)"   # PyTorch + the CUDA version it was built for
+
+# --- CPU / NUMA / sleep states (≈10 seconds) ---
+lscpu | head -20                                                 # CPU model, core count, socket layout
+numactl --hardware                                               # NUMA node count and cross-socket distance
+cat /sys/module/intel_idle/parameters/max_cstate 2>/dev/null     # deepest CPU sleep state the kernel will use (Midway: 2)
+cpupower frequency-info | head                                   # CPU governor (performance vs powersave)
+cpupower idle-info     | head                                    # C-state idle-driver detail
+
+# --- IRQ and host warnings (≈5 seconds) ---
+grep nvidia /proc/interrupts | head                              # which CPUs are handling GPU completion interrupts
+dmesg | grep -iE "nvidia|throttle|c-state" | tail -30            # any GPU/CPU warnings in the kernel log
 ```
 
-If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6`, that is the primary structural difference. If DSI also shows `NV6`, the topology is similar and the 10–50 ms gaps are more likely attributable to NUMA mis-binding or a different PyTorch/CUDA version — both of which affect how quickly the kernel launch signal reaches the GPU command processor without being about Python overhead per se.
+**The single most informative line is the first one.** If DSI's driver or driver-supported CUDA version differs from Midway's `535.216.03 / 12.2`, that is the leading lead. Beyond that:
+
+- If `nvidia-smi topo -m` shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6`, that is a structural GPU-interconnect difference worth noting (though, per the discussion above, the GPU-to-GPU links matter less for the CPU-to-GPU handoff path that we are actually investigating).
+- If `nvidia-smi --query-gpu=name,vbios_version` shows a different H200 board variant or firmware version than Midway, the door opens to a firmware-mediated effect on the H200 side itself.
+- If `cat /sys/module/intel_idle/parameters/max_cstate` returns a value higher than 2, deep CPU idle states are enabled and could plausibly contribute (Midway is restricted to C2 with a 41 μs exit latency — too small to cause 10-50 ms gaps on its own, but DSI may differ).
+- If `grep nvidia /proc/interrupts` shows GPU completion interrupts pinned to a single CPU that is also handling NIC or NVMe traffic, that is another candidate.
+- If `dmesg` shows recurring `throttle`, `c-state`, or NVIDIA warnings, the kernel itself is flagging something we should follow up on.
+
+This block is a superset of the diagnostic block that already appears in the "Real-Pangu dispatch test" subsection above — the dispatch test wraps the same commands into the test's own `.out` header so we record them automatically every time the test runs. The DSI ask is the same commands run once on a DSI node and pasted back into a comment on this report or shared via email.
 
 ---
 
