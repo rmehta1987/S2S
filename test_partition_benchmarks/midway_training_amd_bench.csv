@@ -1,0 +1,2 @@
+timestamp,git_sha,run_num,n_gpus,batch_per_gpu,amp_dtype,ddp_find_unused,n_loaders,step_med,step_p90,step_mean,step_std,cpu_prep_med,compute_med,cpu_prep_frac,samples_per_s,peak_mem_gb_max_rank,scaler_skips,n_steps_counted
+2026-05-22T11:15:01,597b8572b028,,4,2,bf16,false,1,0.898653,0.899667,0.898648,0.000747,0.002428,0.896215,0.0027,8.902,69.111,0,80
