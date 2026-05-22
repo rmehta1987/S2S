@@ -329,8 +329,8 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | NVIDIA cluster | H100 NVL | — | unknown¹ | — | — | 42–45 GB/s² | ~0%² | — | 37–57% | 27 (GPU0) | ✓ |
 | DSI | H200 | unknown | unknown | unknown | unknown | 41.6 GB/s² | **>100 MB: ~0% (all GPUs flat at 55 GB/s)**; all transfers avg: GPU0/3 −21/-24%, GPU1/2 −7/-10%² | — | 15–23% | 423 (GPU0); 649–894 (GPU1–3) | ✓ |
-| Midway Intel (test) | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 21 | 44–46 GB/s aggregate, symmetric across GPUs³ | **22 MB upper_air: −2 to −4%**; 1–4 MB latency-bound: −55 to −60%³ | 0.018 ms⁴ | unavailable⁵ | unavailable⁵ | partial⁵ |
-| Midway AMD (test) | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 32 | NUMA-aligned: GPU0/1 ≈ 39 GB/s, GPU2/3 ≈ 49 GB/s³ | ~0% additional concurrent drop⁶ | 0.012 ms⁴ | unavailable⁵ | unavailable⁵ | partial⁵ |
+| Midway Intel (test) | H200 | Gold-6542Y | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 21 | 44–46 GB/s aggregate, symmetric across GPUs³ | **22 MB upper_air: −2 to −4%**; 1–4 MB latency-bound: −55 to −60%³ | synthetic 0.018 ms⁴; **real Pangu 0.024–0.030 ms¹⁰** | n/a⁵ | **0 in real-Pangu test (n=1,180)¹⁰** | partial⁵; dispatch via cudaEvent¹⁰ |
+| Midway AMD (test) | H200 | EPYC-9335 | NV6 full mesh | 2 (GPU0/1 vs GPU2/3)⁷ | 32 | NUMA-aligned: GPU0/1 ≈ 39 GB/s, GPU2/3 ≈ 49 GB/s³ | ~0% additional concurrent drop⁶ | synthetic 0.012 ms⁴; **real Pangu 0.021–0.022 ms¹⁰** | n/a⁵ | **0 in real-Pangu test (n=1,180)¹⁰** | partial⁵; dispatch via cudaEvent¹⁰ |
 | Midway pedramh-gpu | H100 NVL | Xeon Gold 6346 (Ice Lake) | NV12 within pairs only⁸ | 2 (GPU0/1 vs GPU2/3)⁸ | 20 | ~27 GB/s (PCIe Gen4 limit)⁸ | NUMA-aligned: GPU2/3 −42% on H2D, GPU0/1 −48% on D2H⁸ | pending⁹ | pending⁹ | pending⁹ | pending⁹ |
 
 ¹ We never ran the GPU interconnect topology check on the NVIDIA cluster, so we don't know if its H100 NVL cards use NVLink or not.
@@ -350,6 +350,8 @@ To understand whether the DSI performance issues are DSI-specific or reflect the
 ⁸ pedramh-gpu (`midway3-0423`) is **H100 NVL on Xeon Gold 6346 (Ice Lake)** — i.e., the same GPU model as the NVIDIA cluster, but a Midway host. From `test_partition_benchmarks/midway_bandwidth_midway_bandwidth_test.sh_49972059.out` and `test_partition_benchmarks/pedramh_hw_topo.out`: 2 sockets × 16 cores (NUMA distance 10/20), driver 535.216.03, CUDA 12.2. NVLink topology is **NV12 within socket-pairs only** (GPU0↔GPU1 = NV12, GPU2↔GPU3 = NV12, but {GPU0,1} ↔ {GPU2,3} = `SYS`/cross-socket UPI, no NVLink) — fundamentally different from Midway H200's NV6 full mesh. Ice Lake is PCIe Gen4 only, so the H100 NVL bandwidth ceiling here is ~32 GB/s rather than the ~64 GB/s achievable on Gen5 hosts; the 27 GB/s sequential figure is ~84% of Gen4 theoretical and is comparable in *fraction of available bandwidth* to Midway H200's 53 GB/s out of Gen5's 64 GB/s. Under concurrent 4-GPU load, H2D shows a NUMA-aligned drop: GPU0/1 hold ~27 GB/s while GPU2/3 collapse to ~14 GB/s (−42%). On D2H the asymmetry inverts (GPU0/1 collapse, GPU2/3 hold) — consistent with the dataloader pinning host buffers on one NUMA node for input and the destination buffers on another for output.
 
 ⁹ Dispatch-gap, GPU-utilisation, and kernel-mix figures for pedramh-gpu will be filled in once `v2.0/HPC_scripts/midway_infer_nsys.sh` is submitted and the resulting `midway_h100_4gpus_inference.{nsys-rep,sqlite}` is run through `verify_bench.py`. This will give a direct H100-NVL-on-Midway-host vs H100-NVL-on-NVIDIA-cluster comparison, the cleanest test for whether the DSI dispatch latency is host-environment-specific or GPU-architecture-specific.
+
+¹⁰ Real-Pangu dispatch test (`v2.0/test/inference_dispatch_real.py`, submission scripts `midway_dispatch_real_{intel,amd}.sh`). Uses `torch.cuda.Event` pairs to measure GPU idle between consecutive forward passes of the actual `PanguModel_Plasim` with production-shape random inputs. In-process timing, no profiler attach, no `ptrace` dependency. Across 1,180 inter-step gaps per Midway node (4 reps × 60 steps × 1 GPU + 4 reps × 60 steps × 4 GPUs − 8 startup gaps not counted at the rep boundary, summing to ~1,180 measurements per cluster row), zero gaps exceeded 10 ms; the maximum gap observed on either node across both phases was 66 microseconds. DSI under matching conditions shows 41 gaps of 10–50 ms on 1 GPU and 423–894 across the four GPUs. Software stack for these runs (identical on both nodes): NVIDIA driver 535.216.03, driver CUDA 12.2, PyTorch 2.6.0+cu124 (running in CUDA forward-compatibility mode), `intel_idle` driver with `menu` governor and C2_ACPI maximum (41 μs exit latency). See the "Real-Pangu dispatch test" subsection below for the full discussion of what the test measures, what it rules out, and what caveats apply.
 
 ### Key findings from the Midway benchmarks
 
@@ -371,6 +373,87 @@ To understand the NUMA effect: a dual-socket server has two CPU chips, each with
 The AMD pattern is consistent with the dataloader allocating pinned buffers preferentially on one NUMA node — GPUs on the same node see local memory, GPUs on the other node pay the cross-socket cost. The Intel node does not show this split in our measurements, which may reflect either a different allocator placement on the Intel host, a faster cross-socket fabric, or a measurement that simply did not exercise the imbalance. Without explicit `numactl --membind` testing we cannot distinguish these. AMD's symmetry under concurrent load (no further degradation on top of the sequential split) is consistent with sufficient per-GPU PCIe bandwidth headroom on EPYC-9335, but with only one node measured per CPU family we cannot generalise this to a property of "AMD PCIe architecture" — it could equally reflect this specific board's slot wiring, driver version, or BIOS configuration.
 
 **DSI's averaged bandwidth pattern matches no other host we've measured — but only in the small-transfer regime.** DSI's *averaged-over-all-transfers* concurrent H2D drops are GPU0 = −24.3%, GPU1 = −7.2%, GPU2 = −10.1%, GPU3 = −21.4% — slow on GPU0 and GPU3, less affected on GPU1 and GPU2. This bimodal pair-split is not the NUMA {0,1}-vs-{2,3} split seen on AMD H200 or on pedramh-gpu H100 NVL, nor the symmetric-on-large-tensors pattern seen on Intel H200. A {0,3} split would fit a topology like a PCIe-switch grouping where one switch holds {0,2} and another {1,3} on opposite sockets, or a non-standard slot wiring — but pinning this down requires `nvidia-smi topo -m` from DSI. However, restricting to the >100 MB transfers that constitute the production weather-data path, **all four DSI GPUs sustain 55.4 GB/s under 4-GPU concurrent load — identical to single-GPU DSI and identical to the H100 cluster**. So the bimodal asymmetry exists only for small transfers, not for the dominant data path. This is consistent with a small-transfer / host-dispatch contention story rather than a bus-level PCIe topology problem. Without `nvidia-smi topo -m` from DSI we still cannot fully characterise the hardware layout, but the bandwidth observations no longer require a topology explanation for the production workload.
+
+### Real-Pangu dispatch test on Midway H200 (2026-05-22 update)
+
+To close the gap left by the test partition's ptrace restriction (which blocks `nsys` kernel tracing on the Midway H200 4-GPU profiles, footnote 5), we ran a custom test that measures inter-step GPU-idle time directly with in-process `torch.cuda.Event` pairs. The test does not need a profiler attached, so it works on the test partition. Source: `v2.0/test/inference_dispatch_real.py`; submission scripts: `v2.0/HPC_scripts/midway_dispatch_real_{intel,amd}.sh`.
+
+**What the test measures.** The autoregressive loop is what the inference run actually does: 60 sequential forward passes of `PanguModel_Plasim`, each one taking the previous step's output as its next input. Between every two consecutive forward passes there is an interval — what we call the *dispatch gap* — where the GPU has finished the last kernel of step N but the CPU has not yet queued the first kernel of step N+1.
+
+```
+        ┌────────── step N ──────────┐                     ┌──── step N+1 ────
+GPU:   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃    gap (idle)    ┃━━━━━━━━━━━━━━━━━━━━━ ...
+                                       ▲                  ▲
+                                  end_event[N]      start_event[N+1]
+                                  recorded here     recorded here
+
+CPU during the gap is doing:
+  1. return from model(...)
+  2. outputs.append(out_s.detach())          ← production list-append pattern
+  3. rebind surface = out_s, upper_air = out_u
+  4. record start_event[N+1] on the stream
+  5. re-enter model(...) and queue the first kernel of step N+1
+```
+
+If the CPU does all of that faster than the GPU finishes step N, the GPU never goes idle and the gap is ≈ 0 (sub-microsecond). If anything stalls the CPU — Python overhead, scheduler preemption, NUMA-distant memory access during kernel-launch parameter copy, IRQ handler stealing the CPU, deep C-state exit — the GPU sits there and we measure how long.
+
+**What the test deliberately excludes**, so the measured gaps are unambiguously dispatch-path effects and not something else:
+
+- **No HDF5 read.** Inputs are random tensors allocated once on the GPU at startup. No `DataLoader`, no `pin_memory` copies, no disk I/O between steps.
+- **No D2H transfers between steps.** Production stacks the full 60-step output and copies it to CPU at the end of each outer iteration; we don't do that part. (A D2H stall would be a different cost class and would show up in the >100 ms gap bucket of the DSI nsys profile, not the 10-50 ms bucket.)
+- **No NCCL.** Inference is data-parallel-only, no collectives, no `find_unused_parameters`.
+- **No checkpoint save / `inv_transform` / async-save thread.** These happen at outer-iteration boundaries, not between steps within the autoregressive loop.
+
+This is the exact class of gap that the DSI nsys profile classifies as 10-50 ms — kernel-to-kernel idle inside the inference loop, after data is already resident on the GPU. The user's annotation in the summary section captures this distinction: *"a data loader is not the problem as the gaps appear somewhere during model inference itself."*
+
+**Results.** Across both Midway H200 nodes, both 1-GPU and 4-GPU phases, all four ranks: **zero gaps exceeded 10 ms** in 1,180 measurements per node.
+
+| Configuration | n | median | p99 | max | gaps > 10 ms |
+|---|---:|---:|---:|---:|---:|
+| Midway Intel, 1 GPU (batch=8) | 236 | 0.025 ms | 0.032 ms | 0.043 ms | **0** |
+| Midway Intel, 4 GPUs (batch=2/GPU) | 944 | 0.024–0.030 ms | 0.038–0.040 ms | 0.060 ms | **0** |
+| Midway AMD, 1 GPU (batch=8) | 236 | 0.021 ms | 0.027 ms | 0.066 ms | **0** |
+| Midway AMD, 4 GPUs (batch=2/GPU) | 944 | 0.021–0.022 ms | 0.024–0.028 ms | 0.058 ms | **0** |
+| (Reference: DSI 1-GPU from nsys) | — | — | — | — | 41 |
+| (Reference: DSI 4-GPU GPU0 from nsys) | — | — | — | — | 423 |
+| (Reference: DSI 4-GPU GPU1–3 from nsys) | — | — | — | — | 649–894 |
+
+Maximum gap across all 2,360 measurements on Midway: **66 microseconds**. The smallest DSI gap that lands in the 10-50 ms bucket is **at least 150× larger**.
+
+**What this finding rules out (decisively, on Midway evidence alone):**
+
+- **The H200 architecture as a cause** of the DSI dispatch latency. The same GPU on a different host shows no such latency.
+- **4-rank `torchrun` as an inherent producer** of the gaps. Midway runs 4 ranks the same way as DSI and sees zero.
+- **NUMA mis-binding *alone*** as sufficient to cause the gaps. Midway has GPUs split across 2 NUMA nodes, no explicit `numactl --membind` was done, and the test still produces zero gaps. NUMA misplacement of pinned buffers is therefore not the entire mechanism on DSI; if it contributes there, it does so in combination with another factor.
+- **Deep CPU C-states** as the mechanism on Midway. The Midway `intel_idle` driver is restricted to C1/C2 with a 41 μs maximum exit latency — three orders of magnitude too small to produce 10-50 ms gaps.
+- **The model itself** (random-weight init with real architecture and production tensor shapes is enough to surface the gaps — they would have appeared here if they were intrinsic to the model's kernel pattern).
+
+**What this finding does *not* rule out**, and which remain candidates for the DSI-specific cause:
+
+1. **DSI driver / CUDA version mismatch.** Midway runs driver 535.216.03 with driver CUDA 12.2 and PyTorch built for cu124 (forward-compat). If DSI runs an older or newer driver — especially anything in known-bad regions for kernel completion IRQ — that is the leading candidate.
+2. **DSI kernel / OS configuration** (different `intel_pstate` governor, different `kernel.sched_min_granularity_ns`, different `intel_idle.max_cstate`, different cgroup throttling).
+3. **DSI co-tenant CPU contention.** If the DSI node was not exclusive at capture time, a co-tenant could be stealing CPU cycles in the 10-50 ms range.
+4. **DSI-specific IRQ steering** that funnels nvidia completion interrupts onto a CPU that's also fielding other heavy IRQs (NIC, NVMe).
+5. **DSI filesystem effect.** Although the dispatch test deliberately strips out disk I/O, the production DSI run does read from disk between outer iterations, and if that read holds a kernel lock (e.g., page-cache contention) the lock may carry into the autoregressive loop on subsequent kernel launches.
+
+**Caveat on absolute scale.** The forward-pass times in this test were higher than production (Intel 1-GPU batch=8: 407 ms; 4-GPU batch=2/GPU: 133 ms; AMD 1-GPU batch=8: 986 ms; 4-GPU batch=2/GPU: 104 ms), compared to the production target of ~14 ms per forward at batch=1 on H100. Most likely causes: random init weights drove cuDNN autotune to slower kernels, and the test did not set `torch.backends.cudnn.benchmark = True`. Longer forward passes give the CPU more slack to dispatch the next launch — so this test is *biased in favour of* not finding gaps. The result is decisive only because Midway gaps are so far below DSI's that even an order-of-magnitude tighter loop (forwards ≈ 10 ms instead of 100–1000 ms) would still leave Midway clean at the sub-millisecond scale. A follow-up tightened-loop run with `cudnn.benchmark = True` and warmed-up weights would close that small gap in rigour.
+
+**The cheapest next diagnostic** is to ask the DSI team for the same data we have for Midway. One short script run on a DSI node would resolve most of the candidate list:
+
+```bash
+nvidia-smi | head -3                                            # driver + driver-CUDA version
+nvidia-smi --query-gpu=driver_version --format=csv
+python -c "import torch; print(torch.__version__, torch.version.cuda)"
+nvidia-smi topo -m
+numactl --hardware
+cat /sys/module/intel_idle/parameters/max_cstate 2>/dev/null
+cpupower frequency-info | head
+cpupower idle-info     | head
+grep nvidia /proc/interrupts | head
+dmesg | grep -iE "nvidia|throttle|c-state" | tail -30
+```
+
+If the DSI driver version differs from `535.216.03`, that is the lead to investigate first.
 
 **What we can and cannot compare between Midway and DSI.**
 
@@ -395,15 +478,22 @@ If DSI shows `PIX` or `PHB` links (PCIe-only, no NVLink) where Midway shows `NV6
 
 ---
 
-## Summary of DSI investigation as of 2026-05-21
+## Summary of DSI investigation as of 2026-05-22
 
 **The main problem.** The DSI cluster's H200 GPUs spend most of their time sitting idle rather than running the model. Three facts now bound the explanation: (1) the actual forecast computation takes about the same time per GPU on DSI as on the NVIDIA cluster (within ~10%), so the H200 is doing the work at a similar rate to the H100; (2) the dominant data path — the large weather-data tensors moving from CPU to GPU — sustains ~55 GB/s on both clusters under 4-GPU load, so the PCIe bus is not the bottleneck for the production workload; (3) the GPUs nevertheless keep stopping and waiting for 10–50 ms between consecutive bursts of work, hundreds of times per run, and the NVIDIA cluster barely does this at all. The wall-time deficit is therefore almost entirely **dispatch latency** — the CPU not handing the next batch of work to the GPU fast enough — rather than compute or bandwidth.
 
-**What was ruled out.** Both clusters ran the same code (with the caveat that the software stack — CUDA, cuDNN, nsys version — was not held strictly constant between the bare-metal DSI host and the NGC apptainer used on NVIDIA). A dispatch timing test on Midway's H200 machines showed the gaps between steps in a Python loop are under a tenth of a millisecond when the model is 4–6× slower than Pangu — an upper bound on Python overhead under generous CPU conditions rather than a direct measurement under Pangu's tighter loop, but enough to rule out a fundamentally too-slow Python loop as the cause. We also confirmed that adding more data loading workers would not help, because the data loading pipeline is not serialised across the four GPUs — each GPU already has its own independent loader, and the pinned-memory configuration matches NVIDIA's byte-for-byte.
+**What was ruled out.** Both clusters ran the same code (with the caveat that the software stack — CUDA, cuDNN, nsys version — was not held strictly constant between the bare-metal DSI host and the NGC apptainer used on NVIDIA). A dispatch timing test on Midway's H200 machines using a *synthetic* model gave a first upper bound (sub-millisecond Python overhead). A follow-up test running the *real* PanguModel_Plasim through the same 60-step autoregressive loop on both Midway H200 nodes (1 GPU and 4 GPUs) showed **zero inter-step gaps exceeding 10 ms in 2,360 measurements** — maximum gap observed was 66 microseconds, vs DSI's 41-894 gaps in the 10-50 ms range under the same loop. This directly rules out the H200 architecture, the 4-rank `torchrun` pattern, and naïve NUMA mis-binding as causes; the DSI dispatch latency is host-environment-specific. We also confirmed that adding more data loading workers would not help, because the data loading pipeline is not serialised across the four GPUs — each GPU already has its own independent loader, and the pinned-memory configuration matches NVIDIA's byte-for-byte.
 
-**What the Midway tests showed.** Midway has two types of H200 nodes — Intel CPU and AMD CPU. Both have direct high-speed connections between the four GPUs. On the **production-sized weather tensors** (~22 MB each per H2D call, ~165 MB averaged across the larger pinned transfers), the Intel node delivers identical bandwidth on all four GPUs whether they pull data one at a time or all at once — only −2 to −4% degradation under simultaneous load. The headline "loses about half its bandwidth" figure that appeared in earlier drafts came from averaging in smaller (1–4 MB) tensors that are latency-dominated rather than bandwidth-dominated; on those the four ranks compete for host-side dispatch and serialise badly, but that does not reflect a problem with the PCIe bus itself. The AMD node shows a ~20% sequential speed difference between the four GPUs even when only one is active — GPUs 0 and 1 are slower than GPUs 2 and 3 because they read from a different bank of CPU memory — but does not slow down further under simultaneous load. **The same correction applies to DSI**: when restricted to the production-sized transfers, all four DSI GPUs sustain ~55 GB/s under 4-GPU load, identical to single-GPU DSI and identical to the NVIDIA H100 cluster. The bimodal "−24% on GPU0/3" figure quoted earlier in this report is the all-transfers average and is dominated by the same small-transfer / host-dispatch contention seen on Intel. A timing test on a single Midway H200 GPU showed the Python loop adds under a millisecond between forecast steps when running a synthetic stand-in model — but the stand-in is 4–6× slower per step than real Pangu, so this is an upper bound on Python overhead under generous CPU conditions, not a direct measurement at Pangu's actual step time.  **However, a data loader is not the problem as the gaps appear somewhere during model inference it self.** We collected the four-GPU hardware timelines on both Midway H200 nodes, but they are missing the on-GPU kernel records (the test partition's security policy blocks the profiler's kernel-tracing channel), so we have data-transfer numbers from the real four-GPU run but cannot reproduce DSI's gap analysis on Midway. 
+**What the Midway tests showed.** Midway has two types of H200 nodes — Intel CPU and AMD CPU. Both have direct high-speed connections between the four GPUs. On the **production-sized weather tensors** (~22 MB each per H2D call, ~165 MB averaged across the larger pinned transfers), the Intel node delivers identical bandwidth on all four GPUs whether they pull data one at a time or all at once — only −2 to −4% degradation under simultaneous load. The headline "loses about half its bandwidth" figure that appeared in earlier drafts came from averaging in smaller (1–4 MB) tensors that are latency-dominated rather than bandwidth-dominated; on those the four ranks compete for host-side dispatch and serialise badly, but that does not reflect a problem with the PCIe bus itself. The AMD node shows a ~20% sequential speed difference between the four GPUs even when only one is active — GPUs 0 and 1 are slower than GPUs 2 and 3 because they read from a different bank of CPU memory — but does not slow down further under simultaneous load. **The same correction applies to DSI**: when restricted to the production-sized transfers, all four DSI GPUs sustain ~55 GB/s under 4-GPU load, identical to single-GPU DSI and identical to the NVIDIA H100 cluster. The bimodal "−24% on GPU0/3" figure quoted earlier in this report is the all-transfers average and is dominated by the same small-transfer / host-dispatch contention seen on Intel.
 
-**What still needs to be learned.** We do not know the specifics of the DSI machine's hardware — which GPUs are connected to which CPU socket, whether there is high-speed GPU-to-GPU interconnect, and how the system assigns work to CPU cores. Two commands run on the DSI machine would answer most of these questions in seconds (`nvidia-smi topo -m` and `numactl --hardware`). The pedramh-gpu hardware topology is now known (see footnote 8) — what remains for that node is the full 4-GPU inference profile (queued: `v2.0/HPC_scripts/midway_infer_nsys.sh`). Once that lands, plus the two real-Pangu dispatch tests on the H200 test partition (`midway_dispatch_real_intel.sh`, `midway_dispatch_real_amd.sh`), we will have three independent data points that should disambiguate "H100 vs H200 architectural difference" from "DSI host-environment configuration".
+A first dispatch test on a single Midway H200 GPU showed the Python loop adds under a millisecond between forecast steps when running a synthetic stand-in model — but the stand-in is 4–6× slower per step than real Pangu, so it is an upper bound on Python overhead under generous CPU conditions, not a direct measurement at Pangu's actual step time.  **However, a data loader is not the problem as the gaps appear somewhere during model inference it self.** A follow-up test (`v2.0/test/inference_dispatch_real.py`) ran the **actual PanguModel_Plasim** through the same 60-step autoregressive loop on both Midway H200 nodes (1 GPU and 4 GPUs) and measured inter-step gaps directly with in-process cudaEvent timing — no profiler needed, so it bypasses the test partition's ptrace restriction. Result: **zero gaps over 10 ms across 2,360 measurements** (maximum observed: 66 microseconds) on both nodes. DSI under the same loop shows 41 gaps in the 10-50 ms bucket on a single GPU and 423-894 across four GPUs. This is the decisive evidence that the DSI dispatch latency is host-environment-specific: the H200 hardware itself dispatches kernels cleanly, even with 4 ranks sharing the host and without explicit NUMA binding. See the "Real-Pangu dispatch test" subsection above for the full discussion. 
+
+**What still needs to be learned.** As of 2026-05-22, the picture has narrowed considerably:
+
+- **Midway H200 dispatch under real Pangu is now measured and clean** (footnote 10 / "Real-Pangu dispatch test" subsection above). The H200 architecture and the 4-rank `torchrun` pattern are no longer candidates for the DSI dispatch issue.
+- **The pedramh-gpu hardware topology is known** (footnote 8). What remains for that node is the full 4-GPU inference profile via `v2.0/HPC_scripts/midway_infer_nsys.sh` — that gives a direct H100-NVL-on-Midway-host vs H100-NVL-on-NVIDIA-cluster comparison with full kernel timing.
+- **The leading remaining unknown is the DSI software stack** — driver version, kernel idle/scheduler config, IRQ steering, and whether the node was exclusive at capture time. The short diagnostic block at the end of the "Real-Pangu dispatch test" subsection above lists exactly what to ask for. If DSI's driver version differs from Midway's `535.216.03`, that is the lead to investigate first.
+- DSI's hardware topology (`nvidia-smi topo -m`, `numactl --hardware`) is also still missing and would resolve the remaining bandwidth-pattern question (why GPU0 and GPU3 group together rather than the {0,1}/{2,3} split seen on AMD and pedramh-gpu).
 
 ---
 
