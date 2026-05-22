@@ -1,0 +1,134 @@
+=== midway_bandwidth_test: 2026-05-21T23:00:46-05:00 ===
+JOB_ID=49972059  NODELIST=midway3-0423
+GPU 0: NVIDIA H100 NVL (UUID: GPU-28b2b7c3-e2d1-a02b-8b29-e26d8fc62d7e)
+GPU 1: NVIDIA H100 NVL (UUID: GPU-3cb41d14-59de-436f-4ede-557b7cfa0f44)
+GPU 2: NVIDIA H100 NVL (UUID: GPU-e89e6f5a-4b64-6160-1fbd-efc0a1258d81)
+GPU 3: NVIDIA H100 NVL (UUID: GPU-50d312fb-8028-bea0-87e1-795d7e643bb6)
+
+=== GPU topology ===
+	[4mGPU0	GPU1	GPU2	GPU3	NIC0	NIC1	NIC2	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	NV12	SYS	SYS	PIX	SYS	SYS	0-15	0		N/A
+GPU1	NV12	 X 	SYS	SYS	PIX	SYS	SYS	0-15	0		N/A
+GPU2	SYS	SYS	 X 	NV12	SYS	PIX	PIX	16-31	1		N/A
+GPU3	SYS	SYS	NV12	 X 	SYS	PIX	PIX	16-31	1		N/A
+NIC0	PIX	PIX	SYS	SYS	 X 	SYS	SYS				
+NIC1	SYS	SYS	PIX	PIX	SYS	 X 	PIX				
+NIC2	SYS	SYS	PIX	PIX	SYS	PIX	 X 				
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+NIC Legend:
+
+  NIC0: mlx5_0
+  NIC1: mlx5_1
+  NIC2: mlx5_2
+
+
+=== NUMA hardware ===
+available: 2 nodes (0-1)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+node 0 size: 257633 MB
+node 0 free: 249200 MB
+node 1 cpus: 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+node 1 size: 258006 MB
+node 1 free: 249208 MB
+node distances:
+node   0   1 
+  0:  10  20 
+  1:  20  10 
+
+=== Bandwidth test ===
+
+Node GPU summary:
+  GPU0: NVIDIA H100 NVL  (99.9 GB)
+  GPU1: NVIDIA H100 NVL  (99.9 GB)
+  GPU2: NVIDIA H100 NVL  (99.9 GB)
+  GPU3: NVIDIA H100 NVL  (99.9 GB)
+
+Config: batch_per_gpu=2  upper_channels=85  inference_steps=15
+Warmup=10  Reps=50
+
+H2D shapes (DataLoader inputs — CPU → GPU each inference step):
+  surf_input                    1.3 MB  (2, 5, 128, 256)
+  upper_air_input              22.3 MB  (2, 85, 128, 256)
+  varying_boundary              3.9 MB  (2, 15, 1, 128, 256)
+
+D2H shapes (stacked outputs — GPU → CPU after all steps complete):
+  surf_output_stacked          21.0 MB  (32, 5, 128, 256)
+  upper_output_stacked        356.5 MB  (32, 85, 128, 256)
+  diag_output_stacked           8.4 MB  (32, 2, 128, 256)
+
+
+Running H2D sequential test (one GPU at a time)...
+
+===========================================================================
+  H2D Sequential — no contention
+===========================================================================
+  tensor                      size_MB  GPU0 GB/s  GPU1 GB/s  GPU2 GB/s  GPU3 GB/s
+  -------------------------------------------------------------------------------
+  surf_input                      1.3       20.18       19.80       20.04       20.02  
+  upper_air_input                22.3       27.19       27.15       27.18       27.18  
+  varying_boundary                3.9       24.77       24.60       24.67       24.67  
+
+  AGGREGATE (median)                        24.77       24.60       24.67       24.67  
+
+Running H2D concurrent test (all GPUs simultaneously)...
+
+===========================================================================
+  H2D Concurrent — under load
+===========================================================================
+  tensor                      size_MB  GPU0 GB/s  GPU1 GB/s  GPU2 GB/s  GPU3 GB/s
+  -------------------------------------------------------------------------------
+  surf_input                      1.3       10.74       19.92       20.05       19.98  
+  upper_air_input                22.3       27.18       27.12       13.96       13.96  
+  varying_boundary                3.9       24.22       24.53       14.25       14.21  
+
+  AGGREGATE (median)                        24.22       24.53       14.23       14.21  
+
+  Contention delta (concurrent − sequential), median across all tensors:
+    GPU0: -0.55 GB/s  (-2.2%)
+    GPU1: -0.07 GB/s  (-0.3%)
+    GPU2: -10.44 GB/s  (-42.3%)
+    GPU3: -10.46 GB/s  (-42.4%)
+
+
+Running D2H sequential test (one GPU at a time)...
+
+===========================================================================
+  D2H Sequential — no contention
+===========================================================================
+  tensor                      size_MB  GPU0 GB/s  GPU1 GB/s  GPU2 GB/s  GPU3 GB/s
+  -------------------------------------------------------------------------------
+  surf_output_stacked            21.0       27.85       27.90       27.92       27.92  
+  upper_output_stacked          356.5       28.55       28.55       28.55       28.55  
+  diag_output_stacked             8.4       27.15       27.09       27.13       27.14  
+
+  AGGREGATE (median)                        27.85       27.90       27.92       27.92  
+
+Running D2H concurrent test (all GPUs simultaneously)...
+
+===========================================================================
+  D2H Concurrent — under load
+===========================================================================
+  tensor                      size_MB  GPU0 GB/s  GPU1 GB/s  GPU2 GB/s  GPU3 GB/s
+  -------------------------------------------------------------------------------
+  surf_output_stacked            21.0       14.38       14.93       27.88       27.89  
+  upper_output_stacked          356.5       14.28       14.31       14.30       14.29  
+  diag_output_stacked             8.4       26.78       14.55       27.04       26.96  
+
+  AGGREGATE (median)                        14.40       14.44       27.03       26.96  
+
+  Contention delta (concurrent − sequential), median across all tensors:
+    GPU0: -13.44 GB/s  (-48.3%)
+    GPU1: -13.46 GB/s  (-48.2%)
+    GPU2: -0.89 GB/s  (-3.2%)
+    GPU3: -0.96 GB/s  (-3.4%)
+
