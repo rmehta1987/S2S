@@ -1,0 +1,89 @@
+=== midway_nsys_kernel_diag 4gpu H200 Intel: 2026-05-23T03:16:57-05:00 ===
+JOB_ID=50059586  NODE=midway3-0603
+driver=535.216.03
+nsys=/software/cuda-12.9-el8-x86_64/bin/nsys  NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0
+NUM_GPUS=4
+
+
+############################################
+### CASE A_bare_cuda
+### cmd: nsys profile -t cuda -o /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/A_bare_cuda --force-overwrite=true python /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+rank=0 done
+Collecting data...
+Generating '/scratch/local/jobs/50059586/nsys-report-bbc5.qdstrm'
+[1/1] [0%                          ] A_bare_cuda.nsys-rep[1/1] [0%                          ] A_bare_cuda.nsys-rep[1/1] [=========44%                ] A_bare_cuda.nsys-rep[1/1] [===========50%              ] A_bare_cuda.nsys-rep[1/1] [============55%             ] A_bare_cuda.nsys-rep[1/1] [============56%             ] A_bare_cuda.nsys-rep[1/1] [============57%             ] A_bare_cuda.nsys-rep[1/1] [=============58%            ] A_bare_cuda.nsys-rep[1/1] [=============59%            ] A_bare_cuda.nsys-rep[1/1] [=============60%            ] A_bare_cuda.nsys-rep[1/1] [==============61%           ] A_bare_cuda.nsys-rep[1/1] [==============62%           ] A_bare_cuda.nsys-rep[1/1] [==============63%           ] A_bare_cuda.nsys-rep[1/1] [===============65%          ] A_bare_cuda.nsys-rep[1/1] [===============66%          ] A_bare_cuda.nsys-rep[1/1] [================71%         ] A_bare_cuda.nsys-rep[1/1] [=================72%        ] A_bare_cuda.nsys-rep[1/1] [=================73%        ] A_bare_cuda.nsys-rep[1/1] [=================74%        ] A_bare_cuda.nsys-rep[1/1] [==================75%       ] A_bare_cuda.nsys-rep[1/1] [==================77%       ] A_bare_cuda.nsys-rep[1/1] [===================79%      ] A_bare_cuda.nsys-rep[1/1] [====================84%     ] A_bare_cuda.nsys-rep[1/1] [=====================89%    ] A_bare_cuda.nsys-rep[1/1] [=======================96%  ] A_bare_cuda.nsys-rep[1/1] [========================99% ] A_bare_cuda.nsys-rep[1/1] [========================100%] A_bare_cuda.nsys-rep[1/1] [========================100%] A_bare_cuda.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/A_bare_cuda.nsys-rep
+>>> CASE A_bare_cuda: KERNEL = 51 events
+
+############################################
+### CASE B_full_flags
+### cmd: nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true -o /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/B_full_flags --force-overwrite=true python /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+rank=0 done
+Collecting data...
+Generating '/scratch/local/jobs/50059586/nsys-report-c495.qdstrm'
+[1/1] [0%                          ] B_full_flags.nsys-rep[1/1] [0%                          ] B_full_flags.nsys-rep[1/1] [8%                          ] B_full_flags.nsys-rep[1/1] [========42%                 ] B_full_flags.nsys-rep[1/1] [===========52%              ] B_full_flags.nsys-rep[1/1] [==============63%           ] B_full_flags.nsys-rep[1/1] [==============64%           ] B_full_flags.nsys-rep[1/1] [===============65%          ] B_full_flags.nsys-rep[1/1] [===============66%          ] B_full_flags.nsys-rep[1/1] [===============67%          ] B_full_flags.nsys-rep[1/1] [================68%         ] B_full_flags.nsys-rep[1/1] [================70%         ] B_full_flags.nsys-rep[1/1] [================71%         ] B_full_flags.nsys-rep[1/1] [=================72%        ] B_full_flags.nsys-rep[1/1] [=================73%        ] B_full_flags.nsys-rep[1/1] [=================74%        ] B_full_flags.nsys-rep[1/1] [==================75%       ] B_full_flags.nsys-rep[1/1] [==================76%       ] B_full_flags.nsys-rep[1/1] [==================77%       ] B_full_flags.nsys-rep[1/1] [===================79%      ] B_full_flags.nsys-rep[1/1] [===================80%      ] B_full_flags.nsys-rep[1/1] [===================82%      ] B_full_flags.nsys-rep[1/1] [====================84%     ] B_full_flags.nsys-rep[1/1] [====================85%     ] B_full_flags.nsys-rep[1/1] [=====================87%    ] B_full_flags.nsys-rep[1/1] [=====================89%    ] B_full_flags.nsys-rep[1/1] [=======================94%  ] B_full_flags.nsys-rep[1/1] [========================99% ] B_full_flags.nsys-rep[1/1] [========================100%] B_full_flags.nsys-rep[1/1] [========================100%] B_full_flags.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/B_full_flags.nsys-rep
+>>> CASE B_full_flags: KERNEL = 51 events
+
+############################################
+### CASE C_torchrun_1
+### cmd: nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true -o /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/C_torchrun_1 --force-overwrite=true torchrun --standalone --nproc_per_node=1 /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+rank=0 done
+[rank0]:[W523 03:18:36.344031614 ProcessGroupNCCL.cpp:1496] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Collecting data...
+Generating '/scratch/local/jobs/50059586/nsys-report-5fe3.qdstrm'
+[1/1] [0%                          ] C_torchrun_1.nsys-rep[1/1] [0%                          ] C_torchrun_1.nsys-rep[1/1] [5%                          ] C_torchrun_1.nsys-rep[1/1] [10%                         ] C_torchrun_1.nsys-rep[1/1] [=16%                        ] C_torchrun_1.nsys-rep[1/1] [==21%                       ] C_torchrun_1.nsys-rep[1/1] [====27%                     ] C_torchrun_1.nsys-rep[1/1] [======33%                   ] C_torchrun_1.nsys-rep[1/1] [=======38%                  ] C_torchrun_1.nsys-rep[1/1] [=========44%                ] C_torchrun_1.nsys-rep[1/1] [==========49%               ] C_torchrun_1.nsys-rep[1/1] [===========50%              ] C_torchrun_1.nsys-rep[1/1] [===========51%              ] C_torchrun_1.nsys-rep[1/1] [===========52%              ] C_torchrun_1.nsys-rep[1/1] [===========53%              ] C_torchrun_1.nsys-rep[1/1] [============54%             ] C_torchrun_1.nsys-rep[1/1] [============55%             ] C_torchrun_1.nsys-rep[1/1] [============56%             ] C_torchrun_1.nsys-rep[1/1] [============57%             ] C_torchrun_1.nsys-rep[1/1] [=============58%            ] C_torchrun_1.nsys-rep[1/1] [=============59%            ] C_torchrun_1.nsys-rep[1/1] [=============60%            ] C_torchrun_1.nsys-rep[1/1] [==============61%           ] C_torchrun_1.nsys-rep[1/1] [==============62%           ] C_torchrun_1.nsys-rep[1/1] [==============63%           ] C_torchrun_1.nsys-rep[1/1] [==============64%           ] C_torchrun_1.nsys-rep[1/1] [===============65%          ] C_torchrun_1.nsys-rep[1/1] [===============66%          ] C_torchrun_1.nsys-rep[1/1] [===============67%          ] C_torchrun_1.nsys-rep[1/1] [================68%         ] C_torchrun_1.nsys-rep[1/1] [================69%         ] C_torchrun_1.nsys-rep[1/1] [================70%         ] C_torchrun_1.nsys-rep[1/1] [================71%         ] C_torchrun_1.nsys-rep[1/1] [=================72%        ] C_torchrun_1.nsys-rep[1/1] [=================73%        ] C_torchrun_1.nsys-rep[1/1] [=================74%        ] C_torchrun_1.nsys-rep[1/1] [==================75%       ] C_torchrun_1.nsys-rep[1/1] [==================76%       ] C_torchrun_1.nsys-rep[1/1] [==================77%       ] C_torchrun_1.nsys-rep[1/1] [==================78%       ] C_torchrun_1.nsys-rep[1/1] [===================79%      ] C_torchrun_1.nsys-rep[1/1] [===================80%      ] C_torchrun_1.nsys-rep[1/1] [===================81%      ] C_torchrun_1.nsys-rep[1/1] [===================82%      ] C_torchrun_1.nsys-rep[1/1] [====================83%     ] C_torchrun_1.nsys-rep[1/1] [====================84%     ] C_torchrun_1.nsys-rep[1/1] [====================85%     ] C_torchrun_1.nsys-rep[1/1] [=====================86%    ] C_torchrun_1.nsys-rep[1/1] [=====================87%    ] C_torchrun_1.nsys-rep[1/1] [=====================88%    ] C_torchrun_1.nsys-rep[1/1] [=====================89%    ] C_torchrun_1.nsys-rep[1/1] [======================90%   ] C_torchrun_1.nsys-rep[1/1] [======================91%   ] C_torchrun_1.nsys-rep[1/1] [======================92%   ] C_torchrun_1.nsys-rep[1/1] [=======================93%  ] C_torchrun_1.nsys-rep[1/1] [=======================94%  ] C_torchrun_1.nsys-rep[1/1] [=======================95%  ] C_torchrun_1.nsys-rep[1/1] [=======================96%  ] C_torchrun_1.nsys-rep[1/1] [========================97% ] C_torchrun_1.nsys-rep[1/1] [========================98% ] C_torchrun_1.nsys-rep[1/1] [========================99% ] C_torchrun_1.nsys-rep[1/1] [========================100%] C_torchrun_1.nsys-rep[1/1] [========================100%] C_torchrun_1.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/C_torchrun_1.nsys-rep
+>>> CASE C_torchrun_1: KERNEL = 51 events
+
+############################################
+### CASE D_torchrun_4
+### cmd: nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true -o /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/D_torchrun_4 --force-overwrite=true torchrun --standalone --nproc_per_node=4 /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+W0523 03:19:04.773000 1508868 site-packages/torch/distributed/run.py:792] 
+W0523 03:19:04.773000 1508868 site-packages/torch/distributed/run.py:792] *****************************************
+W0523 03:19:04.773000 1508868 site-packages/torch/distributed/run.py:792] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0523 03:19:04.773000 1508868 site-packages/torch/distributed/run.py:792] *****************************************
+rank=0 done
+rank=1 done
+rank=2 done
+rank=3 done
+[rank0]:[W523 03:19:10.261886375 ProcessGroupNCCL.cpp:1496] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Collecting data...
+Generating '/scratch/local/jobs/50059586/nsys-report-5a89.qdstrm'
+[1/1] [0%                          ] D_torchrun_4.nsys-rep[1/1] [0%                          ] D_torchrun_4.nsys-rep[1/1] [7%                          ] D_torchrun_4.nsys-rep[1/1] [9%                          ] D_torchrun_4.nsys-rep[1/1] [12%                         ] D_torchrun_4.nsys-rep[1/1] [=========44%                ] D_torchrun_4.nsys-rep[1/1] [============55%             ] D_torchrun_4.nsys-rep[1/1] [============56%             ] D_torchrun_4.nsys-rep[1/1] [============57%             ] D_torchrun_4.nsys-rep[1/1] [=============58%            ] D_torchrun_4.nsys-rep[1/1] [=============59%            ] D_torchrun_4.nsys-rep[1/1] [=============60%            ] D_torchrun_4.nsys-rep[1/1] [==============61%           ] D_torchrun_4.nsys-rep[1/1] [==============62%           ] D_torchrun_4.nsys-rep[1/1] [==============63%           ] D_torchrun_4.nsys-rep[1/1] [==============64%           ] D_torchrun_4.nsys-rep[1/1] [===============65%          ] D_torchrun_4.nsys-rep[1/1] [===============66%          ] D_torchrun_4.nsys-rep[1/1] [================70%         ] D_torchrun_4.nsys-rep[1/1] [=================72%        ] D_torchrun_4.nsys-rep[1/1] [=================73%        ] D_torchrun_4.nsys-rep[1/1] [==================76%       ] D_torchrun_4.nsys-rep[1/1] [==================77%       ] D_torchrun_4.nsys-rep[1/1] [==================78%       ] D_torchrun_4.nsys-rep[1/1] [===================79%      ] D_torchrun_4.nsys-rep[1/1] [===================80%      ] D_torchrun_4.nsys-rep[1/1] [===================81%      ] D_torchrun_4.nsys-rep[1/1] [====================83%     ] D_torchrun_4.nsys-rep[1/1] [====================85%     ] D_torchrun_4.nsys-rep[1/1] [=====================86%    ] D_torchrun_4.nsys-rep[1/1] [======================90%   ] D_torchrun_4.nsys-rep[1/1] [======================92%   ] D_torchrun_4.nsys-rep[1/1] [=======================93%  ] D_torchrun_4.nsys-rep[1/1] [=======================95%  ] D_torchrun_4.nsys-rep[1/1] [========================99% ] D_torchrun_4.nsys-rep[1/1] [========================100%] D_torchrun_4.nsys-rep[1/1] [========================100%] D_torchrun_4.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_4gpu_50059586/D_torchrun_4.nsys-rep
+>>> CASE D_torchrun_4: KERNEL = 204 events
+
+============================================
+SUMMARY
+============================================
+  A_bare_cuda         KERNEL = 51 events
+  B_full_flags        KERNEL = 51 events
+  C_torchrun_1        KERNEL = 51 events
+  D_torchrun_4        KERNEL = 204 events
+
+Profiles + sqlite in: /project/pedramh/shared/S2S/nsys_diag_4gpu_50059586
