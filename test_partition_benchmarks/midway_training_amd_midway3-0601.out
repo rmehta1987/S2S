@@ -1,0 +1,184 @@
+=== midway_training_amd: 2026-05-22T11:12:37-05:00 ===
+JOB_ID=50018860  NODE=midway3-0601
+--- nvidia-smi -L ---
+GPU 0: NVIDIA H200 (UUID: GPU-d42524a8-1cc3-8519-f3cc-66d2c9c7285b)
+GPU 1: NVIDIA H200 (UUID: GPU-7d1836a2-0029-e4af-3f8c-940fdb85fed0)
+GPU 2: NVIDIA H200 (UUID: GPU-f6120189-f69c-61a4-1795-ac77df5fe831)
+GPU 3: NVIDIA H200 (UUID: GPU-869cdf83-8c6a-c257-8b6e-90084293d3f6)
+
+--- nvidia-smi topo -m ---
+	[4mGPU0	GPU1	GPU2	GPU3	NIC0	NIC1	NIC2	NIC3	NIC4	NIC5	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	NV6	NV6	NV6	PXB	NODE	NODE	NODE	SYS	SYS	0-31	0		N/A
+GPU1	NV6	 X 	NV6	NV6	NODE	NODE	NODE	PXB	SYS	SYS	0-31	0		N/A
+GPU2	NV6	NV6	 X 	NV6	SYS	SYS	SYS	SYS	PXB	NODE	32-63	1		N/A
+GPU3	NV6	NV6	NV6	 X 	SYS	SYS	SYS	SYS	NODE	PXB	32-63	1		N/A
+NIC0	PXB	NODE	SYS	SYS	 X 	NODE	NODE	NODE	SYS	SYS				
+NIC1	NODE	NODE	SYS	SYS	NODE	 X 	PIX	NODE	SYS	SYS				
+NIC2	NODE	NODE	SYS	SYS	NODE	PIX	 X 	NODE	SYS	SYS				
+NIC3	NODE	PXB	SYS	SYS	NODE	NODE	NODE	 X 	SYS	SYS				
+NIC4	SYS	SYS	PXB	NODE	SYS	SYS	SYS	SYS	 X 	NODE				
+NIC5	SYS	SYS	NODE	PXB	SYS	SYS	SYS	SYS	NODE	 X 				
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+NIC Legend:
+
+  NIC0: mlx5_0
+  NIC1: mlx5_1
+  NIC2: mlx5_2
+  NIC3: mlx5_3
+  NIC4: mlx5_4
+  NIC5: mlx5_5
+
+
+--- numactl --hardware ---
+available: 2 nodes (0-1)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+node 0 size: 386642 MB
+node 0 free: 263184 MB
+node 1 cpus: 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63
+node 1 size: 386975 MB
+node 1 free: 379783 MB
+node distances:
+node   0   1 
+  0:  10  32 
+  1:  32  10 
+
+--- gpu name / vbios ---
+name, vbios_version
+NVIDIA H200, 96.00.A5.00.1A
+NVIDIA H200, 96.00.A5.00.1A
+NVIDIA H200, 96.00.A5.00.1A
+NVIDIA H200, 96.00.A5.00.1A
+
+--- cpu / power state (dispatch-latency suspects) ---
+analyzing CPU 0:
+  no or unknown cpufreq driver is active on this CPU
+  CPUs which run at the same hardware frequency: Not Available
+  CPUs which need to have their frequency coordinated by software: Not Available
+  maximum transition latency:  Cannot determine or is not supported.
+Not Available
+  available cpufreq governors: Not Available
+  Unable to determine current policy
+  current CPU frequency: Unable to call hardware
+  current CPU frequency:  Unable to call to kernel
+  boost state support:
+    Supported: yes
+    Active: yes
+CPUidle driver: acpi_idle
+CPUidle governor: menu
+analyzing CPU 0:
+
+Number of idle states: 3
+Available idle states: POLL C1 C2
+POLL:
+Flags/Description: CPUIDLE CORE POLL IDLE
+Latency: 0
+Usage: 29880144
+Duration: 115834269
+C1:
+Flags/Description: ACPI FFH INTEL MWAIT 0x0
+Latency: 1
+Usage: 170187008
+Duration: 3284599842
+C2:
+Flags/Description: ACPI IOPORT 0x814
+Latency: 100
+Usage: 477738770
+
+--- nvidia IRQ steering ---
+ 559:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0       1596          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145728-edge      nvidia
+ 560:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145729-edge      nvidia
+ 561:         13          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145730-edge      nvidia
+ 562:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145731-edge      nvidia
+ 563:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145732-edge      nvidia
+ 564:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145733-edge      nvidia
+ 565:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145734-edge      nvidia
+ 566:          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0          0  IR-PCI-MSI 3145735-edge      nvidia
+
+--- driver / torch versions ---
+535.216.03
+torch=2.6.0+cu124, cuda=12.4
+
+================================================================
+Training benchmark: 4 GPUs, bf16 AMP, 20 warmup + 80 timed steps
+CSV -> /project/pedramh/shared/S2S/midway_training_amd_bench.csv
+================================================================
+World rank: 0
+World rank: 3
+World rank: 2
+This is the starting point f
+Has diagnostic: True
+World size from OS: 4
+World rank: 1
+This is the starting point f
+Has diagnostic: True
+World size from OS: 4
+This is the starting point f
+Has diagnostic: True
+World size from OS: 4
+This is the starting point f
+Has diagnostic: True
+World size from OS: 4
+World size from Cuda: 4
+World size from Cuda: 4
+World size from Cuda: 4
+World size from Cuda: 4
+NVIDIA H200
+Memory Allocated: 0.00 MB
+Memory Cached: 0.00 MB
+4
+NVIDIA H200
+Memory Allocated: 0.00 MB
+Memory Cached: 0.00 MB
+4
+NVIDIA H200
+Memory Allocated: 0.00 MB
+Memory Cached: 0.00 MB
+4
+NVIDIA H200
+Memory Allocated: 0.00 MB
+Memory Cached: 0.00 MB
+4
+Using PyTorch native
+Using PyTorch native
+Using PyTorch native
+Using PyTorch native
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Land variables output will not be masked.mask_output is False. Ocean variables output will not be masked.
+
+mask_output is False. Ocean variables output will not be masked.
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embeddingPad sizes in 3D patch embedding
+
+(0, 0, 0, 0, 1, 0)(0, 0, 0, 0, 1, 0)
+
+Patch SizePatch Size
+
+[2, 4, 4][2, 4, 4]
+
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+[1;34mwandb[0m: 
+[1;34mwandb[0m: You can sync this run to the cloud by running:
+[1;34mwandb[0m: [1mwandb sync /project/pedramh/shared/S2S/wandb/offline-run-20260522_111257-go44gplm[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/offline-run-20260522_111257-go44gplm/logs[0m
+
+=== done: 2026-05-22T11:15:04-05:00 ===
