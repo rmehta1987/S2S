@@ -8,13 +8,12 @@
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --nodelist=midway3-[0603-0606]   # Intel Gold-6542Y, H200 DLC
-                                          # (0602 is the original target but
-                                          # is partially occupied; these are
-                                          # the alternative Intel H200 nodes.
-                                          # The script also auto-skips case D
-                                          # if fewer than 4 GPUs are visible,
-                                          # so partial allocations still work.)
+#SBATCH --nodelist=midway3-0603   # Intel Gold-6542Y, H200 DLC
+                                   # alternatives if busy: midway3-0604/0605/0606
+                                   # (0602 is the original target but was partially
+                                   # occupied at time of writing). The script also
+                                   # auto-skips case D if fewer than 4 GPUs are
+                                   # visible, so partial allocations still work.
 #SBATCH -o midway_nsys_kernel_diag_%N.out
 #SBATCH -e midway_nsys_kernel_diag_%N.err
 
