@@ -8,7 +8,13 @@
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --nodelist=midway3-0602   # Intel Gold-6542Y, H200 DLC
+#SBATCH --nodelist=midway3-[0603-0606]   # Intel Gold-6542Y, H200 DLC
+                                          # (0602 is the original target but
+                                          # is partially occupied; these are
+                                          # the alternative Intel H200 nodes.
+                                          # The script also auto-skips case D
+                                          # if fewer than 4 GPUs are visible,
+                                          # so partial allocations still work.)
 #SBATCH -o midway_nsys_kernel_diag_%N.out
 #SBATCH -e midway_nsys_kernel_diag_%N.err
 
@@ -40,6 +46,9 @@ echo "=== midway_nsys_kernel_diag H200 Intel: $(date -Iseconds) ==="
 echo "JOB_ID=${SLURM_JOB_ID}  NODE=${SLURM_NODELIST}"
 echo "driver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1)"
 echo "nsys=$(which nsys)  $(nsys --version | head -1)"
+
+NUM_GPUS=$(nvidia-smi -L | wc -l)
+echo "NUM_GPUS=${NUM_GPUS}"
 echo
 
 OUTDIR="${SLURM_SUBMIT_DIR}/nsys_diag_${SLURM_JOB_ID}"
@@ -103,10 +112,17 @@ run_case C_torchrun_1 \
         torchrun --standalone --nproc_per_node=1 "$PROBE"
 
 # D: full flags + torchrun, 4 ranks. Matches the production broken config.
-run_case D_torchrun_4 \
-    nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true \
-        -o "${OUTDIR}/D_torchrun_4" --force-overwrite=true \
-        torchrun --standalone --nproc_per_node=4 "$PROBE"
+# Requires 4 GPUs in this allocation; skip if not.
+if [[ "${NUM_GPUS}" -ge 4 ]]; then
+    run_case D_torchrun_4 \
+        nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true \
+            -o "${OUTDIR}/D_torchrun_4" --force-overwrite=true \
+            torchrun --standalone --nproc_per_node=4 "$PROBE"
+else
+    RESULT[D_torchrun_4]="skipped (NUM_GPUS=${NUM_GPUS}, needs 4)"
+    echo
+    echo ">>> CASE D_torchrun_4: skipped (NUM_GPUS=${NUM_GPUS}, needs 4)"
+fi
 
 echo
 echo "============================================"
