@@ -4,16 +4,18 @@
 #SBATCH -p test
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:4
-#SBATCH --exclusive
-#SBATCH --mem=0
+#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:1              # only case D needs 4; A/B/C run on 1 GPU.
+                                   # To also run case D, override at submit time:
+                                   #   sbatch --gres=gpu:4 --exclusive --mem=0 ...
+                                   # on a fully-free node.
+#SBATCH --mem=16G
 #SBATCH --nodelist=midway3-0603   # Intel Gold-6542Y, H200 DLC
-                                   # alternatives if busy: midway3-0604/0605/0606
-                                   # (0602 is the original target but was partially
-                                   # occupied at time of writing). The script also
-                                   # auto-skips case D if fewer than 4 GPUs are
-                                   # visible, so partial allocations still work.
+                                   # alternatives if 0603 has no free GPU:
+                                   # midway3-0604/0605/0606 (also Intel H200).
+                                   # (0602 is the original target but was full at
+                                   # time of writing.) The script auto-skips case D
+                                   # when fewer than 4 GPUs are visible.
 #SBATCH -o midway_nsys_kernel_diag_%N.out
 #SBATCH -e midway_nsys_kernel_diag_%N.err
 
