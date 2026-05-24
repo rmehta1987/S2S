@@ -10,8 +10,8 @@
 #SBATCH --mem=0
 #SBATCH --nodelist=midway3-0602   # Intel Gold-6542Y, 1TB, H200 DLC
                                    # alternatives: midway3-0603/0604/0605/0606
-#SBATCH -o midway_infer_nsys_%N.out
-#SBATCH -e midway_infer_nsys_%N.err
+#SBATCH -o midway_infer_nsys_flush_%N_%j.out
+#SBATCH -e midway_infer_nsys_flush_%N_%j.err
 
 # Nsight Systems inference profile on Midway H200 (Intel CPU) — bare metal,
 # no container, same nsys flags as the DSI collection command so profiles
@@ -47,7 +47,7 @@ NUM_GPUS=$(nvidia-smi -L | wc -l)
 echo "NUM_GPUS=${NUM_GPUS}"
 
 config_file=/project/pedramh/shared/S2S/v2.0/config/exp2.yaml
-NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h200_intel_4gpus_inference"
+NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h200_intel_4gpus_inference_flush_${SLURM_JOB_ID}"
 
 echo "nsys output: ${NSYS_OUT}.nsys-rep"
 
@@ -57,6 +57,7 @@ nsys profile \
     -o "${NSYS_OUT}" \
     --force-overwrite=true \
     --trace-fork-before-exec=true \
+    --cuda-flush-interval=200 \
     torchrun \
         --standalone \
         --nproc_per_node="${NUM_GPUS}" \
