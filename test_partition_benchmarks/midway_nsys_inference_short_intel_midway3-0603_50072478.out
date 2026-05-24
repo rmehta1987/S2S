@@ -1,0 +1,384 @@
+=== midway_nsys_inference_short Intel: 2026-05-23T17:33:56-05:00 ===
+JOB_ID=50072478  NODE=midway3-0603
+driver=535.216.03
+nsys=/software/cuda-12.9-el8-x86_64/bin/nsys  NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0
+GPU 0: NVIDIA H200 (UUID: GPU-c2237bb8-29b3-c553-6390-2bb55b6b8e90)
+GPU 1: NVIDIA H200 (UUID: GPU-871dee55-db23-8ce0-3eed-9afb66007b0a)
+GPU 2: NVIDIA H200 (UUID: GPU-deb30cfa-fd32-89ea-ec2a-9b778ee7b2d4)
+GPU 3: NVIDIA H200 (UUID: GPU-38bd01da-51bd-fd35-6598-7aad4e7f60b8)
+
+NUM_GPUS=4
+Stub checkpoint already present: /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/training_checkpoints/ckpt.tar
+-rw-rw-r-- 1 mehta5 pi-pedramh 948 May 23 17:20 /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/training_checkpoints/ckpt.tar
+nsys output: /project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_short_50072478.nsys-rep
+Has diagnostic: True
+World size from OS: 4
+Has diagnostic: True
+World size from OS: 4
+Has diagnostic: True
+World size from OS: 4
+Has diagnostic: True
+World size from OS: 4
+World size from Cuda: 4
+4
+World size from Cuda: 4World size from Cuda: 4
+
+4
+4
+World size from Cuda: 4
+4
+##########WORLD RANK: TESTING  3
+##########WORLD RANK: TESTING  0
+##########WORLD RANK: TESTING  2
+##########WORLD RANK: TESTING  1
+Valid dataset length: 10001
+Valid dataset length: 10001
+Valid dataset length: 10001
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Valid dataset length: 10001
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+START EPOCH: 0
+Checkpoint restored successfully
+START EPOCH: 0
+Checkpoint restored successfully
+START EPOCH: 0
+Checkpoint restored successfully
+START EPOCH: 0
+Checkpoint restored successfully
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 1, 6, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 2, 6, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-01 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-02 06:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 1, 18, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 2, 18, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-01 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-02 18:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 1, 0, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 2, 0, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+filenmae for start times: 2020-01-01 00:00:00
+_____________________________________________
+Added all variables to dataset
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 1, 12, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 2, 12, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-01 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-02 12:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-01 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-02 06:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-01 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-02 18:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-01 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-02 12:00:00 since it's not 00UTC
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010100_ens_0.nc
+filenmae for start times: 2020-01-02 00:00:00
+_____________________________________________
+Added all variables to dataset
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 3, 6, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 4, 6, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-03 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-04 06:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 3, 18, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 4, 18, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-03 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-04 18:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 3, 12, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 4, 12, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-03 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-04 12:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-03 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-04 06:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-03 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-04 18:00:00 since it's not 00UTC
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010200_ens_0.nc
+Saving predictions...
+Skipping saving for start time 2020-01-03 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-04 12:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 5, 6, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 6, 6, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-05 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-06 06:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 5, 18, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 6, 18, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-05 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-06 18:00:00 since it's not 00UTC
+Saving predictions...
+filenmae for start times: 2020-01-01 00:00:00
+_____________________________________________
+Added all variables to dataset
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 5, 12, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 6, 12, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-05 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-06 12:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-05 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-06 06:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-05 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-06 18:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-05 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-06 12:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 7, 6, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 8, 6, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-07 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-08 06:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 7, 18, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 8, 18, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-07 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-08 18:00:00 since it's not 00UTC
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010100_ens_1.nc
+filenmae for start times: 2020-01-02 00:00:00
+_____________________________________________
+Added all variables to dataset
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 7, 12, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 8, 12, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-07 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-08 12:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-07 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-08 06:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-07 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-08 18:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-07 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-08 12:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 9, 18, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 10, 18, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-09 18:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 9, 6, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 10, 6, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-10 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-09 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-10 06:00:00 since it's not 00UTC
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010200_ens_1.nc
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 9, 12, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 10, 12, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-09 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-10 12:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-09 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-10 06:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-09 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-10 18:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 3, 0, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 4, 0, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+filenmae for start times: 2020-01-03 00:00:00
+_____________________________________________
+Added all variables to dataset
+Saving predictions...
+Skipping saving for start time 2020-01-09 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-10 12:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 11, 18, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 12, 18, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-11 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-12 18:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 11, 6, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 12, 6, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-11 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-12 06:00:00 since it's not 00UTC
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 11, 12, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 12, 12, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+Skipping saving for start time 2020-01-11 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-12 12:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-11 18:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-12 18:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-11 06:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-12 06:00:00 since it's not 00UTC
+Saving predictions...
+Skipping saving for start time 2020-01-11 12:00:00 since it's not 00UTC
+Skipping saving for start time 2020-01-12 12:00:00 since it's not 00UTC
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010300_ens_0.nc
+filenmae for start times: 2020-01-04 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010400_ens_0.nc
+Saving predictions...
+filenmae for start times: 2020-01-03 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010300_ens_1.nc
+filenmae for start times: 2020-01-04 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010400_ens_1.nc
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 5, 0, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 6, 0, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+filenmae for start times: 2020-01-05 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010500_ens_0.nc
+filenmae for start times: 2020-01-06 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010600_ens_0.nc
+Saving predictions...
+filenmae for start times: 2020-01-05 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010500_ens_1.nc
+filenmae for start times: 2020-01-06 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010600_ens_1.nc
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 7, 0, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 8, 0, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+filenmae for start times: 2020-01-07 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010700_ens_0.nc
+filenmae for start times: 2020-01-08 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010800_ens_0.nc
+Saving predictions...
+filenmae for start times: 2020-01-07 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010700_ens_1.nc
+filenmae for start times: 2020-01-08 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010800_ens_1.nc
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 9, 0, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 10, 0, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+filenmae for start times: 2020-01-09 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010900_ens_0.nc
+filenmae for start times: 2020-01-10 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020011000_ens_0.nc
+Saving predictions...
+filenmae for start times: 2020-01-09 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020010900_ens_1.nc
+filenmae for start times: 2020-01-10 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020011000_ens_1.nc
+Saving predictions...
+_____________________________________________
+start times for the first ensemble member: [cftime.DatetimeGregorian(2020, 1, 11, 0, 0, 0, 0, has_year_zero=False), cftime.DatetimeGregorian(2020, 1, 12, 0, 0, 0, 0, has_year_zero=False)]
+_____________________________________________
+filenmae for start times: 2020-01-11 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020011100_ens_0.nc
+filenmae for start times: 2020-01-12 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020011200_ens_0.nc
+Saving predictions...
+filenmae for start times: 2020-01-11 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020011100_ens_1.nc
+filenmae for start times: 2020-01-12 00:00:00
+_____________________________________________
+Added all variables to dataset
+Done saving to directiory:  /project/pedramh/shared/S2S/results/S2S/infer_nsys_intel_diag/predictions/pangu_plasim_infer_nsys_intel_diag_24h_45step_2020011200_ens_1.nc
+Collecting data...
+Generating '/scratch/local/jobs/50072478/nsys-report-cb7c.qdstrm'
+[1/1] [0%                          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [0%                          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [6%                          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [5%                          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [11%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [10%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [9%                          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [8%                          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [12%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [11%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=15%                        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [13%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [14%                         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=15%                        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=16%                        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=17%                        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==18%                       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==19%                       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==20%                       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==21%                       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===22%                      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===23%                      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===24%                      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [====25%                     ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [====26%                     ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [====27%                     ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [====28%                     ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=====29%                    ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=====30%                    ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=====31%                    ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=====32%                    ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [======33%                   ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [======34%                   ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [======35%                   ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=======36%                  ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=======37%                  ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=======38%                  ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=======39%                  ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [========40%                 ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [========41%                 ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [========42%                 ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=========43%                ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=========44%                ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=========45%                ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=========46%                ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==========47%               ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==========48%               ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==========49%               ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===========50%              ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===========51%              ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===========52%              ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===========53%              ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [============54%             ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [============55%             ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [============56%             ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [============57%             ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=============58%            ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=============59%            ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=============60%            ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==============61%           ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==============62%           ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==============63%           ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==============64%           ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===============65%          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===============66%          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===============67%          ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [================68%         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [================69%         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [================70%         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [================71%         ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=================72%        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=================73%        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [=================74%        ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==================75%       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==================76%       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==================77%       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [==================78%       ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===================79%      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===================80%      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===================81%      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [===================82%      ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [====================83%     ] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [========================100%] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep[1/1] [========================100%] midway_h200_intel_4gpus_inference_short_50072478.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_short_50072478.nsys-rep
+Profile written: /project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_short_50072478.nsys-rep
+
+============================================
+SUMMARY
+============================================
+CUPTI activity tables present in /project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_short_50072478.sqlite:
+CUPTI_ACTIVITY_KIND_CUDA_EVENT
+CUPTI_ACTIVITY_KIND_KERNEL
+CUPTI_ACTIVITY_KIND_MEMCPY
+CUPTI_ACTIVITY_KIND_MEMSET
+CUPTI_ACTIVITY_KIND_RUNTIME
+CUPTI_ACTIVITY_KIND_SYNCHRONIZATION
+
+  CUPTI_ACTIVITY_KIND_RUNTIME              2198861 events
+  CUPTI_ACTIVITY_KIND_MEMCPY               6630 events
+  CUPTI_ACTIVITY_KIND_SYNCHRONIZATION      5287 events
+  CUPTI_ACTIVITY_KIND_KERNEL               1805012 events
+  CUPTI_ACTIVITY_KIND_MEMSET               176994 events
+
+VERDICT: KERNEL captured (1805012 events) on a bounded 180s run
+         -> production breakage is duration / buffer-overflow related,
+         NOT structural inside inference_optimized.py.

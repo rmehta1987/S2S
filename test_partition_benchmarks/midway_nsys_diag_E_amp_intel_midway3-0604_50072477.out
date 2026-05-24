@@ -1,0 +1,72 @@
+=== midway_nsys_diag_E_amp Intel: 2026-05-23T17:33:52-05:00 ===
+JOB_ID=50072477  NODE=midway3-0604
+driver=535.216.03
+nsys=/software/cuda-12.9-el8-x86_64/bin/nsys  NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0
+NUM_GPUS=4
+
+
+############################################
+### CASE E1_bare_amp
+### cmd: nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true -o /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/E1_bare_amp --force-overwrite=true python /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+rank=0 done (amp bf16)
+Collecting data...
+Generating '/scratch/local/jobs/50072477/nsys-report-f5b5.qdstrm'
+[1/1] [0%                          ] E1_bare_amp.nsys-rep[1/1] [0%                          ] E1_bare_amp.nsys-rep[1/1] [5%                          ] E1_bare_amp.nsys-rep[1/1] [=========44%                ] E1_bare_amp.nsys-rep[1/1] [===========51%              ] E1_bare_amp.nsys-rep[1/1] [=============59%            ] E1_bare_amp.nsys-rep[1/1] [=============60%            ] E1_bare_amp.nsys-rep[1/1] [==============61%           ] E1_bare_amp.nsys-rep[1/1] [==============62%           ] E1_bare_amp.nsys-rep[1/1] [==============63%           ] E1_bare_amp.nsys-rep[1/1] [===============65%          ] E1_bare_amp.nsys-rep[1/1] [===============66%          ] E1_bare_amp.nsys-rep[1/1] [================68%         ] E1_bare_amp.nsys-rep[1/1] [================69%         ] E1_bare_amp.nsys-rep[1/1] [================70%         ] E1_bare_amp.nsys-rep[1/1] [================71%         ] E1_bare_amp.nsys-rep[1/1] [=================74%        ] E1_bare_amp.nsys-rep[1/1] [==================75%       ] E1_bare_amp.nsys-rep[1/1] [==================76%       ] E1_bare_amp.nsys-rep[1/1] [==================77%       ] E1_bare_amp.nsys-rep[1/1] [==================78%       ] E1_bare_amp.nsys-rep[1/1] [===================80%      ] E1_bare_amp.nsys-rep[1/1] [===================81%      ] E1_bare_amp.nsys-rep[1/1] [====================85%     ] E1_bare_amp.nsys-rep[1/1] [=====================89%    ] E1_bare_amp.nsys-rep[1/1] [=======================96%  ] E1_bare_amp.nsys-rep[1/1] [========================99% ] E1_bare_amp.nsys-rep[1/1] [========================100%] E1_bare_amp.nsys-rep[1/1] [========================100%] E1_bare_amp.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/E1_bare_amp.nsys-rep
+>>> CASE E1_bare_amp: KERNEL = 53 events
+
+############################################
+### CASE E2_torchrun_1_amp
+### cmd: nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true -o /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/E2_torchrun_1_amp --force-overwrite=true torchrun --standalone --nproc_per_node=1 /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+rank=0 done (amp bf16)
+[rank0]:[W523 17:34:22.132918261 ProcessGroupNCCL.cpp:1496] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Collecting data...
+Generating '/scratch/local/jobs/50072477/nsys-report-f35d.qdstrm'
+[1/1] [0%                          ] E2_torchrun_1_amp.nsys-rep[1/1] [0%                          ] E2_torchrun_1_amp.nsys-rep[1/1] [===========52%              ] E2_torchrun_1_amp.nsys-rep[1/1] [===========53%              ] E2_torchrun_1_amp.nsys-rep[1/1] [============55%             ] E2_torchrun_1_amp.nsys-rep[1/1] [============56%             ] E2_torchrun_1_amp.nsys-rep[1/1] [============57%             ] E2_torchrun_1_amp.nsys-rep[1/1] [=============59%            ] E2_torchrun_1_amp.nsys-rep[1/1] [==============61%           ] E2_torchrun_1_amp.nsys-rep[1/1] [==============63%           ] E2_torchrun_1_amp.nsys-rep[1/1] [===============65%          ] E2_torchrun_1_amp.nsys-rep[1/1] [===============67%          ] E2_torchrun_1_amp.nsys-rep[1/1] [================68%         ] E2_torchrun_1_amp.nsys-rep[1/1] [================69%         ] E2_torchrun_1_amp.nsys-rep[1/1] [================70%         ] E2_torchrun_1_amp.nsys-rep[1/1] [=================72%        ] E2_torchrun_1_amp.nsys-rep[1/1] [==================75%       ] E2_torchrun_1_amp.nsys-rep[1/1] [==================78%       ] E2_torchrun_1_amp.nsys-rep[1/1] [===================80%      ] E2_torchrun_1_amp.nsys-rep[1/1] [===================81%      ] E2_torchrun_1_amp.nsys-rep[1/1] [===================82%      ] E2_torchrun_1_amp.nsys-rep[1/1] [====================84%     ] E2_torchrun_1_amp.nsys-rep[1/1] [=====================87%    ] E2_torchrun_1_amp.nsys-rep[1/1] [=====================89%    ] E2_torchrun_1_amp.nsys-rep[1/1] [======================90%   ] E2_torchrun_1_amp.nsys-rep[1/1] [======================92%   ] E2_torchrun_1_amp.nsys-rep[1/1] [=======================93%  ] E2_torchrun_1_amp.nsys-rep[1/1] [=======================94%  ] E2_torchrun_1_amp.nsys-rep[1/1] [=======================95%  ] E2_torchrun_1_amp.nsys-rep[1/1] [=======================96%  ] E2_torchrun_1_amp.nsys-rep[1/1] [========================97% ] E2_torchrun_1_amp.nsys-rep[1/1] [========================98% ] E2_torchrun_1_amp.nsys-rep[1/1] [========================99% ] E2_torchrun_1_amp.nsys-rep[1/1] [========================100%] E2_torchrun_1_amp.nsys-rep[1/1] [========================100%] E2_torchrun_1_amp.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/E2_torchrun_1_amp.nsys-rep
+>>> CASE E2_torchrun_1_amp: KERNEL = 53 events
+
+############################################
+### CASE E3_torchrun_4_amp
+### cmd: nsys profile -t cuda,nvtx,cudnn --trace-fork-before-exec=true -o /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/E3_torchrun_4_amp --force-overwrite=true torchrun --standalone --nproc_per_node=4 /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/probe.py
+############################################
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+W0523 17:34:33.305000 1619159 site-packages/torch/distributed/run.py:792] 
+W0523 17:34:33.305000 1619159 site-packages/torch/distributed/run.py:792] *****************************************
+W0523 17:34:33.305000 1619159 site-packages/torch/distributed/run.py:792] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0523 17:34:33.305000 1619159 site-packages/torch/distributed/run.py:792] *****************************************
+rank=2 done (amp bf16)
+rank=1 done (amp bf16)
+rank=3 done (amp bf16)
+rank=0 done (amp bf16)
+[rank0]:[W523 17:34:39.511035675 ProcessGroupNCCL.cpp:1496] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Collecting data...
+Generating '/scratch/local/jobs/50072477/nsys-report-5012.qdstrm'
+[1/1] [0%                          ] E3_torchrun_4_amp.nsys-rep[1/1] [0%                          ] E3_torchrun_4_amp.nsys-rep[1/1] [7%                          ] E3_torchrun_4_amp.nsys-rep[1/1] [9%                          ] E3_torchrun_4_amp.nsys-rep[1/1] [12%                         ] E3_torchrun_4_amp.nsys-rep[1/1] [=========44%                ] E3_torchrun_4_amp.nsys-rep[1/1] [============55%             ] E3_torchrun_4_amp.nsys-rep[1/1] [============56%             ] E3_torchrun_4_amp.nsys-rep[1/1] [============57%             ] E3_torchrun_4_amp.nsys-rep[1/1] [=============58%            ] E3_torchrun_4_amp.nsys-rep[1/1] [=============59%            ] E3_torchrun_4_amp.nsys-rep[1/1] [=============60%            ] E3_torchrun_4_amp.nsys-rep[1/1] [==============61%           ] E3_torchrun_4_amp.nsys-rep[1/1] [==============62%           ] E3_torchrun_4_amp.nsys-rep[1/1] [==============63%           ] E3_torchrun_4_amp.nsys-rep[1/1] [==============64%           ] E3_torchrun_4_amp.nsys-rep[1/1] [===============65%          ] E3_torchrun_4_amp.nsys-rep[1/1] [===============66%          ] E3_torchrun_4_amp.nsys-rep[1/1] [================71%         ] E3_torchrun_4_amp.nsys-rep[1/1] [=================73%        ] E3_torchrun_4_amp.nsys-rep[1/1] [==================76%       ] E3_torchrun_4_amp.nsys-rep[1/1] [==================77%       ] E3_torchrun_4_amp.nsys-rep[1/1] [==================78%       ] E3_torchrun_4_amp.nsys-rep[1/1] [===================79%      ] E3_torchrun_4_amp.nsys-rep[1/1] [===================80%      ] E3_torchrun_4_amp.nsys-rep[1/1] [===================81%      ] E3_torchrun_4_amp.nsys-rep[1/1] [====================83%     ] E3_torchrun_4_amp.nsys-rep[1/1] [====================85%     ] E3_torchrun_4_amp.nsys-rep[1/1] [=====================89%    ] E3_torchrun_4_amp.nsys-rep[1/1] [======================90%   ] E3_torchrun_4_amp.nsys-rep[1/1] [======================92%   ] E3_torchrun_4_amp.nsys-rep[1/1] [=======================93%  ] E3_torchrun_4_amp.nsys-rep[1/1] [=======================94%  ] E3_torchrun_4_amp.nsys-rep[1/1] [=======================95%  ] E3_torchrun_4_amp.nsys-rep[1/1] [========================99% ] E3_torchrun_4_amp.nsys-rep[1/1] [========================100%] E3_torchrun_4_amp.nsys-rep[1/1] [========================100%] E3_torchrun_4_amp.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/nsys_diag_E_amp_50072477/E3_torchrun_4_amp.nsys-rep
+>>> CASE E3_torchrun_4_amp: KERNEL = 212 events
+
+============================================
+SUMMARY
+============================================
+  E1_bare_amp             KERNEL = 53 events
+  E2_torchrun_1_amp       KERNEL = 53 events
+  E3_torchrun_4_amp       KERNEL = 212 events
+
+Profiles + sqlite in: /project/pedramh/shared/S2S/nsys_diag_E_amp_50072477
