@@ -79,7 +79,8 @@ nsys profile \
         --nproc_per_node="${NUM_GPUS}" \
         /project/pedramh/shared/S2S/v2.0/inference.py \
         --yaml_config="${config_file}" \
-        --run_num="infer_nsys_h200_amd"
+        --run_num="infer_nsys_h200_amd" \
+        --async_save
 
 echo "Profile written: ${NSYS_OUT}.nsys-rep"
 echo "scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep"

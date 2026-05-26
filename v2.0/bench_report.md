@@ -536,3 +536,75 @@ The DSI, NVIDIA, and Midway inference profiles compared in the sections above we
 - **Git SHA of `inference_optimized.py` not recorded** per cluster. Confirm the same file ran by computing the SHA before each capture if reproducing.
 - **The verification script** `verify_bench.py` (at repo root) reproduces every numerical claim above from the .sqlite profiles; re-run it after any rebuild to confirm the numbers still hold.
 
+---
+
+## Update 2026-05-26: profile data finally complete on Midway, plus two real bottlenecks found
+
+### The "missing GPU activity" mystery turned out to be a one-line bug
+
+For the previous few weeks every attempt to record a full GPU profile of the inference workload on Midway came back with the same strange result: the profile said the workload ran for about three seconds and then stopped recording GPU activity entirely. The list of kernels the GPU executed was empty in every profile, while related data like memory copies and synchronisation events looked normal. The investigation chased increasingly elaborate explanations — the profiler version, a driver-level "admin-only profiling" flag, a Linux setting that restricts attaching to other processes, a data-loader theory, even a profiler-buffer-overflow theory. None of these turned out to be the cause.
+
+**The actual cause was much simpler.** The production inference scripts all pass `--run_num=infer_nsys_h200_intel` to `inference.py` (or `inference_optimized.py`), and the script then tries to load a saved model checkpoint from a path it builds from that run name. **That checkpoint file does not exist for our team** — real trained weights live with an upstream collaborator we do not have direct read access to. The Python `torch.load(...)` call was unconditional (no "skip loading if the file is missing" guard), so the workload crashed with a `FileNotFoundError` before launching any GPU compute. The crash happened at the same point during model setup every time, which is why every broken profile looked identical: the profiler was just recording the part of model setup that runs before the crash. Nothing was wrong with the profiler, the cluster, or the driver. The error message had been sitting in the per-job `.err` file all along; reading that file before chasing profiler theories would have saved the entire investigation.
+
+**The fix is a four-line guard:** before calling the checkpoint loader, check whether the file exists; if not, log a warning and continue with random model weights. Inference output values are not meaningful without trained weights, but profile timing data is identical regardless — kernel shapes, launch rates, and bandwidth depend on the model architecture and tensor shapes, not on the weight values. The fix is in commit `56f73fe` and now lives in both inference entry-point scripts. After this fix, Midway profiles capture about 1.88 million kernels per run, matching the DSI and NVIDIA reference profiles almost exactly.
+
+### Bottleneck 1: synchronous saving on the first GPU
+
+Once profiles started recording real data, the first thing they showed was that the first GPU (rank 0) was sitting at only 28.8% utilisation while the other three ranks reached about 50%. The first GPU consistently took longer between iterations: about twenty large pauses on rank 0 averaging three to five seconds each, versus twenty-five pauses averaging under a second on ranks 1–3. The cause turns out to be that the inference loop writes each iteration's forecast output to a NetCDF file on disk at the end of the iteration. By default this write is synchronous — the main Python thread waits for the file to be flushed to disk before moving on — and on rank 0 specifically those writes take three to five seconds. Ranks 1–3 finish their writes quickly enough that the next data batch is ready before the main thread would have moved on anyway, so they don't see the pause.
+
+The inference scripts already supported a fix: a `--async_save` command-line flag that hands each save to a small background thread pool while the main thread keeps dispatching GPU work. Adding the flag to all eight inference profiling scripts (Intel and AMD variants, plus the diagnostic siblings) was a one-line change per script. After enabling `--async_save`, rank 0's utilisation rose from 28.8% to 47.5% and now matches the other three ranks within about a percent.
+
+### Bottleneck 2: the data-loader configuration (resolved, was a self-inflicted test artifact)
+
+An intermediate diagnostic test forced the data loader to use zero background workers — every batch read on the main thread instead of prefetched in parallel. That configuration showed all four GPUs sitting idle 70–78% of the time, in a very specific pattern: each GPU did about two seconds of compute, paused for about fourteen seconds while the main thread read the next batch from disk, did another two seconds of compute, paused again, and so on. The shape of the cycle made the cause obvious: the data loader was the bottleneck, but only because the test had switched off the parallel-prefetch workers. The production default of eight background workers prefetches the next batches while the GPU is busy and keeps the GPUs fed. With the default restored, GPU idle dropped from 70–78% down to about 50%, which is where the second bottleneck above lived.
+
+### Midway snapshot after both fixes
+
+After the missing-checkpoint guard and `--async_save`, the same four-GPU inference workload looks like:
+
+| GPU | GPU-active time | Total elapsed | Utilisation |
+|---|---|---|---|
+| 0 | 27.2 s | 57.3 s | 47.5% |
+| 1 | 27.2 s | 54.9 s | 49.5% |
+| 2 | 27.2 s | 54.3 s | 50.1% |
+| 3 | 27.2 s | 54.2 s | 50.3% |
+
+All four ranks symmetric, all at about 50% utilisation. The remaining 50% of elapsed time is roughly twenty per-iteration pauses common to all four ranks. These are most likely a mix of inter-rank communication waits (NCCL collectives) and Python overhead at iteration boundaries; characterising them precisely is the next step.
+
+### How DSI compares to the post-fix Midway baseline
+
+DSI's profile of the same workload shows the same rank-0 imbalance Midway had before `--async_save`: GPU 0 sits at 15.1% utilisation with 60.4 seconds spent in large pauses, while GPUs 1–3 are at 17–23% with 23–37 seconds. **DSI would benefit from `--async_save` just as Midway did** — the first thing the DSI users should do is add `--async_save` to their inference script invocation and re-measure. That single flag should close most of the rank-0 imbalance on DSI.
+
+Separately — and importantly — DSI also shows a much higher density of short (1–100 millisecond) inter-kernel pauses than Midway. Per-rank counts on the medium-pause buckets:
+
+| Pause size | DSI rank 1 | Midway rank 1 (post-fix) |
+|---|---|---|
+| 10–100 ms | 663 pauses, 11.3 s total | 47 pauses, 2.2 s total |
+| 1–10 ms   | 758 pauses, 4.3 s total  | 64 pauses, 0.2 s total |
+
+DSI has roughly ten times as many small/medium pauses as Midway under the same workload, costing about 15–20 seconds per rank in extra idle. This is the same handoff-latency story the earlier sections of this report identified, and it is independent of the two bottlenecks fixed above. The fix for it almost certainly lives in the DSI host configuration — driver version, kernel idle/scheduler settings, or the container runtime — not in the workload code.
+
+### One important nuance for the DSI comparison
+
+A striking number in the comparison: DSI completes the same ~470,000 kernels per rank in **half the GPU-active time** that Midway needs (13.9 seconds versus 27.2 seconds). So DSI's H200 silicon is genuinely *faster* at the workload's compute than Midway's, despite the rank-0 imbalance and the extra small-pause noise. DSI's wall-time disadvantage is therefore entirely an idle/handoff issue, not a compute issue. If DSI's small-pause noise were fixed, DSI would actually be faster than Midway at this workload.
+
+### Files changed in this update
+
+Workload-side fixes:
+- `v2.0/inference.py`, `v2.0/inference_optimized.py` — `restore_checkpoint()` call now guarded by `os.path.isfile` (commit `56f73fe`).
+
+Profiling scripts (all eight now pass `--async_save`):
+- `midway_infer_nsys_h200_intel.sh` (commit `40f0bd8`)
+- `midway_infer_nsys_h200_amd.sh`
+- `midway_infer_nsys_h200_intel_delay.sh`
+- `midway_infer_nsys_h200_intel_newinfer.sh`
+- `midway_infer_nsys_h200_intel_nsys132.sh`
+- `midway_infer_nsys_h200_amd_newinfer.sh`
+- `midway_nsys_inference_short_intel.sh`
+- `midway_nsys_inference_short_intel_realckpt.sh`
+
+### Recommendations for DSI users
+
+1. Pull the latest `v2.0/inference.py` and `v2.0/inference_optimized.py` from the `bench-instrumentation` branch (the checkpoint-guard fix).
+2. Add `--async_save` to your inference script's torchrun command. Expect the first GPU's utilisation to rise from 15% toward 20%+, matching the other three GPUs.
+3. After both of the above, re-profile and look at the 1–100 millisecond pause counts. If they are still about ten times Midway's, the residual problem is in the DSI host stack — driver, kernel scheduler, container runtime — and the diagnostic command list at the end of the "Real-Pangu dispatch test" section above is the next step.
