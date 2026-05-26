@@ -1,0 +1,97 @@
+nsys binary override: /software/cuda-13.2-el8-x86_64/bin/nsys
+nsys version: NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0
+(for reference, default cuda/12.9 nsys would be: /software/cuda-12.9-el8-x86_64/bin/nsys)
+=== midway_infer_nsys_nsys132 H200 Intel: 2026-05-26T00:24:48-05:00 ===
+JOB_ID=50117688  NODE=midway3-0602
+GPU 0: NVIDIA H200 (UUID: GPU-e9b89cbb-c477-8fb8-c3eb-d214667f1003)
+GPU 1: NVIDIA H200 (UUID: GPU-ec66155c-32ab-8e33-8198-e891226d759e)
+GPU 2: NVIDIA H200 (UUID: GPU-17a889ca-6a0c-6f31-1956-f69088517443)
+GPU 3: NVIDIA H200 (UUID: GPU-33702e97-62ee-833d-fd35-44abfc1a9a0d)
+	[4mGPU0	GPU1	GPU2	GPU3	NIC0	NIC1	NIC2	NIC3	NIC4	NIC5	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	NV6	NV6	NV6	PXB	NODE	SYS	SYS	SYS	SYS	0-23	0		N/A
+GPU1	NV6	 X 	NV6	NV6	NODE	PXB	SYS	SYS	SYS	SYS	0-23	0		N/A
+GPU2	NV6	NV6	 X 	NV6	SYS	SYS	NODE	NODE	PXB	NODE	24-47	1		N/A
+GPU3	NV6	NV6	NV6	 X 	SYS	SYS	NODE	NODE	NODE	PXB	24-47	1		N/A
+NIC0	PXB	NODE	SYS	SYS	 X 	NODE	SYS	SYS	SYS	SYS				
+NIC1	NODE	PXB	SYS	SYS	NODE	 X 	SYS	SYS	SYS	SYS				
+NIC2	SYS	SYS	NODE	NODE	SYS	SYS	 X 	PIX	NODE	NODE				
+NIC3	SYS	SYS	NODE	NODE	SYS	SYS	PIX	 X 	NODE	NODE				
+NIC4	SYS	SYS	PXB	NODE	SYS	SYS	NODE	NODE	 X 	NODE				
+NIC5	SYS	SYS	NODE	PXB	SYS	SYS	NODE	NODE	NODE	 X 				
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+NIC Legend:
+
+  NIC0: mlx5_0
+  NIC1: mlx5_1
+  NIC2: mlx5_2
+  NIC3: mlx5_3
+  NIC4: mlx5_4
+  NIC5: mlx5_5
+
+NUM_GPUS=4
+nsys output: /project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep
+Has diagnostic: True
+World size from OS: 4
+Has diagnostic: True
+World size from OS: 4
+Has diagnostic: True
+World size from OS: 4
+Has diagnostic: True
+World size from OS: 4
+World size from Cuda: 4
+4
+World size from Cuda: 4
+4
+World size from Cuda: 4
+4
+World size from Cuda: 4
+4
+##########WORLD RANK: TESTING  1
+##########WORLD RANK: TESTING  0
+##########WORLD RANK: TESTING  3
+##########WORLD RANK: TESTING  2
+Valid dataset length: 10001
+Valid dataset length: 10001
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+Valid dataset length: 10001
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+Valid dataset length: 10001
+mask_output is False. Land variables output will not be masked.
+mask_output is False. Ocean variables output will not be masked.
+Pad sizes in 3D patch embedding
+(0, 0, 0, 0, 1, 0)
+Patch Size
+[2, 4, 4]
+Collecting data...
+Generating '/scratch/local/jobs/50117688/nsys-report-5622.qdstrm'
+[1/1] [0%                          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [0%                          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [6%                          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [5%                          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [6%                          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [12%                         ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==19%                       ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [====26%                     ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [======33%                   ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [========40%                 ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==========48%               ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===========51%              ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===========52%              ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===========53%              ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [============54%             ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [============55%             ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [============56%             ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [============57%             ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=============58%            ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=============59%            ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=============60%            ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==============61%           ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==============62%           ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==============63%           ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==============64%           ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===============65%          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===============66%          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===============67%          ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [================68%         ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [================69%         ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [================70%         ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [================71%         ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=================72%        ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=================73%        ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=================74%        ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==================75%       ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==================76%       ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==================77%       ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [==================78%       ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===================79%      ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===================80%      ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===================81%      ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [===================82%      ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [====================83%     ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [====================84%     ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [====================85%     ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=====================86%    ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=====================87%    ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=====================88%    ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=====================89%    ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [======================90%   ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [======================91%   ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [======================92%   ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=======================93%  ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=======================94%  ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=======================95%  ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [=======================96%  ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [========================97% ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [========================98% ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [========================99% ] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [========================100%] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep[1/1] [========================100%] midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep
+Generated:
+	/project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep
+Profile written: /project/pedramh/shared/S2S/midway_h200_intel_4gpus_inference_nsys132_50117688.nsys-rep
+scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep
