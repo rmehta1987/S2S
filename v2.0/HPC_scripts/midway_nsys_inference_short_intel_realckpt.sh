@@ -8,13 +8,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --nodelist=midway3-[0602-0603]   # either Intel H200 test-partition node;
-                                          # SLURM picks whichever is idle. Both are
-                                          # Gold-6542Y / H200 DLC; the working short
-                                          # capture (50072348) ran on 0603, the broken
-                                          # production captures on 0602. Hardware spec
-                                          # is identical, so cross-node scheduling
-                                          # shouldn't introduce a confound.
+#SBATCH --nodelist=midway3-0602
 #SBATCH -o midway_nsys_inference_short_intel_realckpt_%N_%j.out
 #SBATCH -e midway_nsys_inference_short_intel_realckpt_%N_%j.err
 
