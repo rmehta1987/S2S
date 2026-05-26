@@ -1,88 +1,0 @@
-nsys version: NVIDIA Nsight Systems version 2025.1.3.140-251335620677v0
-=== midway_infer_nsys H200 AMD EPYC: 2026-05-23T22:39:21-05:00 ===
-JOB_ID=50073956  NODE=midway3-0601
-GPU 0: NVIDIA H200 (UUID: GPU-d42524a8-1cc3-8519-f3cc-66d2c9c7285b)
-GPU 1: NVIDIA H200 (UUID: GPU-7d1836a2-0029-e4af-3f8c-940fdb85fed0)
-GPU 2: NVIDIA H200 (UUID: GPU-f6120189-f69c-61a4-1795-ac77df5fe831)
-GPU 3: NVIDIA H200 (UUID: GPU-869cdf83-8c6a-c257-8b6e-90084293d3f6)
-	[4mGPU0	GPU1	GPU2	GPU3	NIC0	NIC1	NIC2	NIC3	NIC4	NIC5	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
-GPU0	 X 	NV6	NV6	NV6	PXB	NODE	NODE	NODE	SYS	SYS	0-31	0		N/A
-GPU1	NV6	 X 	NV6	NV6	NODE	NODE	NODE	PXB	SYS	SYS	0-31	0		N/A
-GPU2	NV6	NV6	 X 	NV6	SYS	SYS	SYS	SYS	PXB	NODE	32-63	1		N/A
-GPU3	NV6	NV6	NV6	 X 	SYS	SYS	SYS	SYS	NODE	PXB	32-63	1		N/A
-NIC0	PXB	NODE	SYS	SYS	 X 	NODE	NODE	NODE	SYS	SYS				
-NIC1	NODE	NODE	SYS	SYS	NODE	 X 	PIX	NODE	SYS	SYS				
-NIC2	NODE	NODE	SYS	SYS	NODE	PIX	 X 	NODE	SYS	SYS				
-NIC3	NODE	PXB	SYS	SYS	NODE	NODE	NODE	 X 	SYS	SYS				
-NIC4	SYS	SYS	PXB	NODE	SYS	SYS	SYS	SYS	 X 	NODE				
-NIC5	SYS	SYS	NODE	PXB	SYS	SYS	SYS	SYS	NODE	 X 				
-
-Legend:
-
-  X    = Self
-  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
-  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
-  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
-  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
-  PIX  = Connection traversing at most a single PCIe bridge
-  NV#  = Connection traversing a bonded set of # NVLinks
-
-NIC Legend:
-
-  NIC0: mlx5_0
-  NIC1: mlx5_1
-  NIC2: mlx5_2
-  NIC3: mlx5_3
-  NIC4: mlx5_4
-  NIC5: mlx5_5
-
-NUM_GPUS=4
-nsys output: /project/pedramh/shared/S2S/midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep
-Has diagnostic: True
-World size from OS: 4
-Has diagnostic: True
-World size from OS: 4
-Has diagnostic: True
-World size from OS: 4
-Has diagnostic: True
-World size from OS: 4
-World size from Cuda: 4
-4
-World size from Cuda: 4
-4
-World size from Cuda: 4
-4
-World size from Cuda: 4
-4
-##########WORLD RANK: TESTING  0
-##########WORLD RANK: TESTING  1
-##########WORLD RANK: TESTING  3
-##########WORLD RANK: TESTING  2
-Valid dataset length: 10001Valid dataset length: 10001
-
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-Valid dataset length: 10001
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-Collecting data...
-Generating '/scratch/local/jobs/50073956/nsys-report-33c7.qdstrm'
-[1/1] [0%                          ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [0%                          ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [7%                          ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [10%                         ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [13%                         ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=16%                        ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==19%                       ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===22%                      ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [====26%                     ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=====29%                    ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=====32%                    ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [======35%                   ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=======38%                  ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [========41%                 ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=========44%                ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=========46%                ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==========49%               ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===========50%              ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===========51%              ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===========52%              ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===========53%              ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [============54%             ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [============55%             ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [============56%             ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [============57%             ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=============58%            ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=============59%            ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=============60%            ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==============61%           ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==============62%           ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==============63%           ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==============64%           ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===============65%          ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===============66%          ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===============67%          ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [================68%         ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [================69%         ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [================70%         ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [================71%         ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=================72%        ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=================73%        ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=================74%        ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==================75%       ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==================76%       ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==================77%       ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [==================78%       ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===================79%      ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===================80%      ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===================81%      ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [===================82%      ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [====================83%     ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [====================84%     ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [====================85%     ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=====================86%    ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=====================87%    ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=====================88%    ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=====================89%    ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [======================90%   ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [======================91%   ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [======================92%   ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=======================93%  ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=======================94%  ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=======================95%  ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [=======================96%  ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [========================97% ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [========================98% ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [========================99% ] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [========================100%] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep[1/1] [========================100%] midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep
-Generated:
-	/project/pedramh/shared/S2S/midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep
-Profile written: /project/pedramh/shared/S2S/midway_h200_amd_4gpus_inference_flush_50073956.nsys-rep
-scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep
