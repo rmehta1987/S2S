@@ -15,7 +15,22 @@
 #SBATCH -o midway_nsys_inference_short_intel_%N_%j.out
 #SBATCH -e midway_nsys_inference_short_intel_%N_%j.err
 
-# Purpose:
+# MOOT 2026-05-26 -- the CUPTI investigation this script was part of is
+# RESOLVED. The broken-capture fingerprint that motivated it (RUNTIME=4252 /
+# MEMCPY=1960 / SYNC=1960, KERNEL missing) was inference[_optimized].py
+# crashing at restore_checkpoint() on FileNotFoundError before launching any
+# kernel -- not a workload-internal CUPTI failure or a runtime-length issue.
+# Fixed in commit 56f73fe by gating restore_checkpoint on os.path.isfile.
+# See memory: project_midway_cupti_kernel_missing.md.
+#
+# The script itself is still useful as a bounded inference profile (it
+# synthesises a stub checkpoint so the workload runs even when the real
+# ckpt.tar is inaccessible, then caps the trace at 180 s). The diagnostic
+# framing in the rest of this docstring is preserved as historical context.
+# The SUMMARY/VERDICT block has been rewritten in neutral post-resolution
+# language.
+#
+# Purpose (historical, pre-resolution):
 #   The kernel-diag matrix (midway_nsys_kernel_diag_intel_4gpu.sh) showed
 #   that all of the nsys-invocation factors -- trace flags, fork tracking,
 #   torchrun launcher, multi-rank CUPTI -- pass on midway3-0603 with
@@ -160,14 +175,19 @@ done
 
 echo
 KERNEL_COUNT=$(sqlite3 "${NSYS_OUT}.sqlite" "SELECT count(*) FROM CUPTI_ACTIVITY_KIND_KERNEL;" 2>/dev/null)
+# Post-resolution verdict (see MOOT banner at top of file). The original
+# "is the breakage structural in inference_optimized.py" / "is it duration"
+# branches were pre-resolution framing; both possibilities are now closed.
 if [[ -z "$KERNEL_COUNT" ]]; then
-    echo "VERDICT: KERNEL table missing  ->  structural breakage inside"
-    echo "         inference_optimized.py (not a duration / buffer-overflow issue)."
+    echo "VERDICT: KERNEL table missing. The workload did not launch any kernels."
+    echo "         Inspect .err: pre-fix this was FileNotFoundError at"
+    echo "         restore_checkpoint(); other crashes during model init can"
+    echo "         produce the same fingerprint. See memory:"
+    echo "         project_midway_cupti_kernel_missing.md."
 elif [[ "$KERNEL_COUNT" -eq 0 ]]; then
-    echo "VERDICT: KERNEL table present but empty -> CUPTI subscribed but"
-    echo "         dropped every kernel; weird state, inspect nsys stderr."
+    echo "VERDICT: KERNEL table present but empty. CUPTI subscribed but recorded"
+    echo "         no kernels; unusual state, inspect nsys stderr above."
 else
-    echo "VERDICT: KERNEL captured (${KERNEL_COUNT} events) on a bounded 180s run"
-    echo "         -> production breakage is duration / buffer-overflow related,"
-    echo "         NOT structural inside inference_optimized.py."
+    echo "VERDICT: KERNEL captured (${KERNEL_COUNT} events) on a bounded 180s run."
+    echo "         Capture is healthy."
 fi

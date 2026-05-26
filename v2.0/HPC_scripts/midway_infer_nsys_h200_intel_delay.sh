@@ -15,7 +15,17 @@
 
 # Delay-based diagnostic sibling of midway_infer_nsys_h200_intel.sh.
 #
-# Purpose:
+# MOOT 2026-05-26 -- the cuDNN-autotune-burst hypothesis this script was
+# written to test is RESOLVED (falsified, in the sense that it was never
+# the right hypothesis to begin with). The broken-capture fingerprint
+# (RUNTIME=4252 / MEMCPY=1960 / SYNC=1960, KERNEL missing) was actually
+# inference[_optimized].py crashing at restore_checkpoint() on
+# FileNotFoundError before launching any kernel; cuDNN autotune never ran
+# because no forward pass ever started. Fixed in commit 56f73fe. See
+# memory: project_midway_cupti_kernel_missing.md. The "Test" decision tree
+# below should not be used as guidance for new investigations.
+#
+# Purpose (historical, pre-resolution):
 #   The noforktrace + newinfer pair (job 50084384 / 50084385) produced
 #   byte-identical CUPTI counts (RUNTIME=4252, MEMCPY=1960, SYNC=1960,
 #   PROCESSES=692) and the same KERNEL/MEMSET/CUDA_EVENT/OVERHEAD-table-
@@ -23,15 +33,15 @@
 #   the same point in initialisation across both inference scripts, and
 #   isn't affected by --trace-fork-before-exec or --sample=none.
 #
-#   Best remaining hypothesis: cuDNN autotune during the first forward
-#   pass. inference_optimized.py:403 and inference.py both set
-#   torch.backends.cudnn.benchmark = True, which makes the first
+#   Best remaining hypothesis (pre-resolution): cuDNN autotune during the
+#   first forward pass. inference_optimized.py:403 and inference.py both
+#   set torch.backends.cudnn.benchmark = True, which makes the first
 #   forward burst dozens of trial kernel launches per conv layer
 #   (including Hopper-specific wgmma / FA3 paths under bf16 autocast).
 #   If CUPTI's activity-stream subscriber chokes during that burst, it
 #   stays dead for the rest of the run -- exactly the symptom we see.
 #
-# Test:
+# Test (historical decision tree, DO NOT USE):
 #   --delay=15 tells nsys to skip the first 15 s of capture. That covers
 #   model construction + checkpoint load + NCCL init + the cuDNN
 #   autotune burst on the first forward. Capture then begins clean for
@@ -44,9 +54,15 @@
 #   - KERNEL still missing -> not autotune; the trigger is something
 #                             else that survives a 15 s delay.
 #
-# All OTHER nsys flags intentionally match the ORIGINAL production
-# script (--trace-fork-before-exec=true present, no --sample=none, no
-# --cuda-flush-interval) so --delay is the only variable.
+# Note on "the only variable is --delay": the comment above used to claim
+# that all other nsys flags matched the ORIGINAL production script so the
+# only variable vs production was --delay. That invariant no longer holds
+# against today's midway_infer_nsys_h200_intel.sh (the post-dedc9c0 revert
+# restored the `_noforktrace` flavor of that script, which carries
+# --sample=none AND lacks --trace-fork-before-exec=true). So if this
+# script is ever rerun for a different reason, treat it as the
+# (--delay=15 + --trace-fork-before-exec=true + no --sample=none)
+# combination, not as "production + --delay".
 
 ulimit -l unlimited
 

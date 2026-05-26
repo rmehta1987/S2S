@@ -65,6 +65,18 @@
 #                        AMP, kernel launch rate), or pull a genuinely
 #                        newer nsys (>=2025.5) from NVIDIA's developer
 #                        site.
+#
+# FURTHER CORRECTION (2026-05-26): the "workload-specific" framing above is
+# now also moot. The actual cause of the broken fingerprint was
+# inference[_optimized].py crashing at restore_checkpoint() on
+# FileNotFoundError before launching any kernel; the 4252 / 1960 / 1960
+# events are just the CUDA APIs from PanguModel_Plasim(...).to(device) up
+# to the crash point. Fixed in commit 56f73fe by gating restore_checkpoint
+# on os.path.isfile. See memory: project_midway_cupti_kernel_missing.md.
+# The nsys-binary-swap test this script performs (cuda-12.9 vs cuda-13.2,
+# both 2025.1.3.140) is still mechanically valid as a build-comparison
+# exercise, but it does not have the diagnostic significance the original
+# framing implied.
 
 ulimit -l unlimited
 

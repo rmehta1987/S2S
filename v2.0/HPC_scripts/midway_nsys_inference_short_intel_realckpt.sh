@@ -12,7 +12,24 @@
 #SBATCH -o midway_nsys_inference_short_intel_realckpt_%N_%j.out
 #SBATCH -e midway_nsys_inference_short_intel_realckpt_%N_%j.err
 
-# Purpose:
+# MOOT 2026-05-26 -- the bisection this script was written to perform is
+# RESOLVED. The broken-capture fingerprint that motivated it (RUNTIME=4252 /
+# MEMCPY=1960 / SYNC=1960, KERNEL/MEMSET/CUDA_EVENT/OVERHEAD missing) was
+# inference[_optimized].py crashing at restore_checkpoint() on
+# FileNotFoundError before launching any kernel -- not a real-vs-stub-
+# checkpoint or --duration-related CUPTI failure. Fixed in commit 56f73fe by
+# gating restore_checkpoint on os.path.isfile. See memory:
+# project_midway_cupti_kernel_missing.md.
+#
+# The diagnostic framing below is preserved as historical context but is
+# no longer the right way to interpret a result from this script. The
+# fail-fast guard at the REAL_CKPT check is still useful as a "you don't
+# have access to the real checkpoint" lint -- if it fires, that's the same
+# missing-file condition that crashed the production scripts before the fix.
+# The SUMMARY/VERDICT block at the end has been rewritten in neutral
+# post-resolution language.
+#
+# Purpose (historical, pre-resolution):
 #   The working Midway inference capture (job 50072348, produced by
 #   midway_nsys_inference_short_intel.sh) is the only Midway nsys profile
 #   to date that successfully populated CUPTI_ACTIVITY_KIND_KERNEL
@@ -176,19 +193,18 @@ done
 
 echo
 KERNEL_COUNT=$(sqlite3 "${NSYS_OUT}.sqlite" "SELECT count(*) FROM CUPTI_ACTIVITY_KIND_KERNEL;" 2>/dev/null)
+# Post-resolution verdict (see MOOT banner at top of file). The original
+# real-vs-stub bisection these branches were written for is closed; treat
+# this as a basic capture-health check.
 if [[ -z "$KERNEL_COUNT" ]]; then
-    echo "VERDICT: KERNEL table missing -> real-checkpoint load IS the trigger."
-    echo "         --duration=180 alone is NOT enough to rescue capture when the"
-    echo "         workload also restores a real production checkpoint. Next step:"
-    echo "         bisect restore_checkpoint() (torch.load vs load_state_dict vs"
-    echo "         optimizer-state restore) to isolate which operation poisons CUPTI."
+    echo "VERDICT: KERNEL table missing. The workload did not launch any kernels."
+    echo "         Inspect .err: pre-fix this was FileNotFoundError at"
+    echo "         restore_checkpoint(); other crashes during model init can"
+    echo "         produce the same fingerprint. See memory:"
+    echo "         project_midway_cupti_kernel_missing.md."
 elif [[ "$KERNEL_COUNT" -eq 0 ]]; then
-    echo "VERDICT: KERNEL table present but empty -> CUPTI subscribed but dropped"
-    echo "         every kernel record. Unusual state; inspect nsys stderr above."
+    echo "VERDICT: KERNEL table present but empty. CUPTI subscribed but recorded"
+    echo "         no kernels; unusual state, inspect nsys stderr above."
 else
-    echo "VERDICT: KERNEL captured (${KERNEL_COUNT} events) -> real-checkpoint load"
-    echo "         is NOT the trigger. The discriminator vs the broken production"
-    echo "         captures is then --duration=180 itself. Production fix: add"
-    echo "         --duration=<reasonable_window> to every nsys profile call in"
-    echo "         the midway_infer_nsys_h200_*.sh scripts."
+    echo "VERDICT: KERNEL captured (${KERNEL_COUNT} events). Capture is healthy."
 fi
