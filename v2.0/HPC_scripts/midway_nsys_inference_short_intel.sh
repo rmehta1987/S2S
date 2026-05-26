@@ -12,8 +12,8 @@
                                    # alternatives: midway3-0604/0605/0606
                                    # (use whichever is idle; 0603 is where the
                                    # kernel-diag matrix passed end-to-end.)
-#SBATCH -o midway_nsys_inference_short_intel_noworkers_%N_%j.out
-#SBATCH -e midway_nsys_inference_short_intel_noworkers_%N_%j.err
+#SBATCH -o midway_nsys_inference_short_intel_%N_%j.out
+#SBATCH -e midway_nsys_inference_short_intel_%N_%j.err
 
 # Purpose:
 #   The kernel-diag matrix (midway_nsys_kernel_diag_intel_4gpu.sh) showed
@@ -66,22 +66,10 @@ NUM_GPUS=$(nvidia-smi -L | wc -l)
 echo "NUM_GPUS=${NUM_GPUS}"
 
 config_file=/project/pedramh/shared/S2S/v2.0/config/exp2.yaml
-
-# Intel test-partition override: force num_data_workers=0 to falsify the
-# "DataLoader fork from CUDA-initialised parent disturbs CUPTI" hypothesis
-# (see memory: project_midway_cupti_kernel_missing.md). exp2.yaml is left
-# untouched so AMD scripts and training continue to use num_data_workers=8;
-# the override lives in a per-job derived config.
-ORIG_CONFIG="${config_file}"
-config_file="${SLURM_SUBMIT_DIR}/exp2_no_data_workers_${SLURM_JOB_ID}.yaml"
-sed 's/num_data_workers: 8/num_data_workers: 0/' "${ORIG_CONFIG}" > "${config_file}"
-echo "Derived config (num_data_workers=0): ${config_file}"
-grep -n 'num_data_workers' "${config_file}"
-
 RUN_NUM="infer_nsys_intel_diag"
 # Jobid-suffix the nsys output so concurrent / repeated G submissions don't
 # overwrite each other's .nsys-rep / .sqlite.
-NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h200_intel_4gpus_inference_short_noworkers_${SLURM_JOB_ID}"
+NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h200_intel_4gpus_inference_short_${SLURM_JOB_ID}"
 
 # inference_optimized.py:412-416 hardcodes
 #   checkpoint_path = ${cwd}/results/S2S/${run_num}/training_checkpoints/ckpt.tar
