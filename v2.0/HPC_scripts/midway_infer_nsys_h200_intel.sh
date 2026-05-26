@@ -10,8 +10,8 @@
 #SBATCH --mem=0
 #SBATCH --nodelist=midway3-0602   # Intel Gold-6542Y, 1TB, H200 DLC
                                    # alternatives: midway3-0603/0604/0605/0606
-#SBATCH -o midway_infer_nsys_noforktrace_%N_%j.out
-#SBATCH -e midway_infer_nsys_noforktrace_%N_%j.err
+#SBATCH -o midway_infer_nsys_noforktrace_noworkers_%N_%j.out
+#SBATCH -e midway_infer_nsys_noforktrace_noworkers_%N_%j.err
 
 # Nsight Systems inference profile on Midway H200 (Intel CPU) — bare metal,
 # no container, same nsys flags as the DSI collection command so profiles
@@ -47,7 +47,19 @@ NUM_GPUS=$(nvidia-smi -L | wc -l)
 echo "NUM_GPUS=${NUM_GPUS}"
 
 config_file=/project/pedramh/shared/S2S/v2.0/config/exp2.yaml
-NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h200_intel_4gpus_inference_noforktrace_${SLURM_JOB_ID}"
+
+# Intel test-partition override: force num_data_workers=0 to falsify the
+# "DataLoader fork from CUDA-initialised parent disturbs CUPTI" hypothesis
+# (see memory: project_midway_cupti_kernel_missing.md). exp2.yaml is left
+# untouched so AMD scripts and training continue to use num_data_workers=8;
+# the override lives in a per-job derived config.
+ORIG_CONFIG="${config_file}"
+config_file="${SLURM_SUBMIT_DIR}/exp2_no_data_workers_${SLURM_JOB_ID}.yaml"
+sed 's/num_data_workers: 8/num_data_workers: 0/' "${ORIG_CONFIG}" > "${config_file}"
+echo "Derived config (num_data_workers=0): ${config_file}"
+grep -n 'num_data_workers' "${config_file}"
+
+NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h200_intel_4gpus_inference_noforktrace_noworkers_${SLURM_JOB_ID}"
 
 echo "nsys output: ${NSYS_OUT}.nsys-rep"
 
