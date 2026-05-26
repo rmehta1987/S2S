@@ -50,3 +50,9 @@ wandb/
 gif_out/
 acc_plots/
 spectra_out/
+
+# Nsight Systems profile artifacts (large binary captures, not source)
+*.nsys-rep
+*.sqlite
+*.qdrep
+*.qdstrm
