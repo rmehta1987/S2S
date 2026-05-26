@@ -102,8 +102,13 @@ class Stepper():
 
         self.iters = 0
         self.startEpoch = 0
-        #if params.resuming:
-        self.restore_checkpoint(params.checkpoint_path)
+        if os.path.isfile(params.checkpoint_path):
+            self.restore_checkpoint(params.checkpoint_path)
+        elif params.log_to_screen:
+            logging.warning(
+                "No checkpoint at %s; running inference with random weights "
+                "(outputs are not meaningful unless this is a deliberate "
+                "profiling run).", params.checkpoint_path)
         self.epoch = self.startEpoch
 
 
