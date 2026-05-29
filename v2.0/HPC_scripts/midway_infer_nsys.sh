@@ -63,7 +63,7 @@ echo "NUM_GPUS=${NUM_GPUS}"
 
 config_file=/project/pedramh/shared/S2S/v2.0/config/exp2.yaml
 run_num="infer_nsys_$(date +%s)"
-NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h100_4gpus_inference"
+NSYS_OUT="${SLURM_SUBMIT_DIR}/midway_h100_4gpus_inference_${SLURM_JOB_ID}_$(date +%F)"
 
 echo "nsys output: ${NSYS_OUT}.nsys-rep"
 
@@ -72,7 +72,6 @@ nsys profile \
     -t cuda,nvtx,cudnn \
     -o "${NSYS_OUT}" \
     --force-overwrite=true \
-    --trace-fork-before-exec=true \
     torchrun \
         --standalone \
         --nproc_per_node="${NUM_GPUS}" \
