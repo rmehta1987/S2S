@@ -78,7 +78,8 @@ nsys profile \
         --nproc_per_node="${NUM_GPUS}" \
         /project/pedramh/shared/S2S/v2.0/inference_optimized.py \
         --yaml_config="${config_file}" \
-        --run_num="${run_num}"
+        --run_num="${run_num}" \
+        --async_save
 
 
 
