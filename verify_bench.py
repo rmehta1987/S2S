@@ -8,6 +8,12 @@ FILES = {
     "DSI_1GPU": "/home/rmeht/Projects/S2S/dsi_h200_1gpu_inference.sqlite",
     "DSI_4GPU": "/home/rmeht/Projects/S2S/dsi_h200_4gpus_inference.sqlite",
     "NVIDIA_4GPU": "/home/rmeht/Projects/S2S/nvidia_h100_4gpus_inference.sqlite",
+    # Post-fix Midway H200 test-partition captures (2026-05-29, standardized
+    # bare-DSI nsys command, commit 3acb9b3; checkpoint guard 56f73fe means the
+    # inference loop now runs and kernels are captured — earlier captures crashed
+    # at restore_checkpoint and held only ~3-4k runtime events, no kernel table).
+    "MIDWAY_INTEL_4GPU_POSTFIX": "/home/rmeht/Projects/S2S/test_partition_benchmarks/midway_h200_intel_4gpus_inference_50244406_2026-05-29.sqlite",
+    "MIDWAY_AMD_4GPU_POSTFIX": "/home/rmeht/Projects/S2S/test_partition_benchmarks/midway_h200_amd_4gpus_inference_50244404_2026-05-29.sqlite",
 }
 
 
