@@ -253,7 +253,50 @@ The H200 nodes train this config **~26–28% faster** than the pedramh-gpu H100 
 
 ## 6. VAE ensemble generation — architecture notes
 
-The VAE generates 4 ensemble members by repeating each input 4× and injecting different noise draws at the encoder bottleneck, sampled from a distribution whose mean/variance the encoder learns. A second encoder branch, training-only, processes the target weather state and provides a reference distribution the forecast encoder is trained to match.
+The VAE generates 4 ensemble members by repeating each input 4× and injecting different noise draws at the encoder bottleneck, sampled from a distribution whose mean/variance the encoder learns. A second encoder branch, training-only, processes the target weather state and provides a reference distribution the forecast encoder is trained to match. Training and inference generate the members by *different* mechanisms — the `train` flag in `PanguModel_Plasim.forward` is the switch:
+
+```
+══════════════════ TRAINING  (forward, train=True) ══════════════════
+
+  input batch: M samples
+        │  to_ensemble_batch()  (train.py)  ── repeat each sample ×4  (num_ensemble_members=4)
+        ▼
+  batch = M×4
+        ▼  shared trunk  (patchembed → layer1 → downsample → layer2/3)
+        ▼  x_vae
+  ┌────────────────────────────────────────────────┐
+  │ ENCODER 1 (prior)                                │  ← runs in BOTH train & inference
+  │   mu = layer_mu(x_vae);  sigma = layer_sigma(…)  │
+  │   norm = reparameterize(mu, sigma)               │  randn PER COPY ⇒ 4 distinct latents
+  │   x_purb = layer_purturbation(norm)              │  from identical inputs
+  └────────────────────────────────────────────────┘
+        ▼  x = x_purb + x  →  decoder (upsample → layer4 → patchrecovery)
+        ▼
+   output: M×4 forecasts ───────────────────────────────┐
+                                                         │
+  target state ─► ENCODER 2 (posterior)                  │  ← TRAIN ONLY, activation-checkpointed
+    target_surface/upper_air     mu_e2 = layer_mu_e2(…)   │
+                                 sigma_e2 = layer_sigma_e2(…)
+            ┌─────────────────────────────┘              │
+            ▼                                             ▼
+   KL(E1 ‖ E2)                                   CRPS  (Latitude_weighted_CRPSLoss)
+   Kl_divergence_gaussians(                      reshape M×4 → (M, 4, …) by num_ensemble_members
+       mu,sigma, mu_e2,sigma_e2)                 = CRPSSkill − 0.5·CRPSSpread
+            │                                             │
+            └──────────►  total = CRPS + vae_loss_weight · KL  ◄──┘   (cal_loss, train.py)
+
+═════════════════ INFERENCE  (forward, train=False) ═════════════════
+
+  for ens_id in range(2):   (inference[_optimized].py — hardcoded 2; config ignored)
+        ▼
+   forward(train=False) ─► ENCODER 1 only → reparameterize → fresh noise
+        │                  (Encoder 2, target inputs, and KL all skipped)
+        ▼
+   autoregressive rollout over inference_steps  →  save_prediction(ens_id)  (one NetCDF/member)
+
+  ⇒ training: 4 members in ONE batched forward (×4 repeat + per-copy noise)
+    inference: 2 members from SEPARATE sequential rollouts (different noise each pass)
+```
 
 **What the KL loss does.** The loss is `KL(Encoder1 ‖ Encoder2)` between two *learned* Gaussians — not against a fixed N(0,1). At inference only Encoder 1 runs, sampling noise that (if KL training worked) resembles what Encoder 2 would have produced from tomorrow's weather. Encoder 2 is a training-time teacher with no inference role.
 
