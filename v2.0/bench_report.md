@@ -262,21 +262,22 @@ The VAE generates 4 ensemble members by repeating each input 4× and injecting d
         │  to_ensemble_batch()  (train.py)  ── repeat each sample ×4  (num_ensemble_members=4)
         ▼
   batch = M×4
-        ▼  shared trunk  (patchembed → layer1 → downsample → layer2/3)
+        ▼  SHARED main encoder trunk:  patchembed → layer1 → downsample → layer2/3
+        ▼     (~14 heavy EarthSpecificLayer blocks — the bulk of compute; runs in BOTH modes)
         ▼  x_vae
   ┌────────────────────────────────────────────────┐
-  │ ENCODER 1 (prior)                                │  ← runs in BOTH train & inference
-  │   mu = layer_mu(x_vae);  sigma = layer_sigma(…)  │
-  │   norm = reparameterize(mu, sigma)               │  randn PER COPY ⇒ 4 distinct latents
-  │   x_purb = layer_purturbation(norm)              │  from identical inputs
+  │ ENCODER 1 (prior HEAD) = 3 × 1×1 conv            │  ← tiny sampling head, NOT a transformer
+  │   mu = layer_mu(x_vae);  sigma = layer_sigma(…)  │     stack → forward AND backward NEGLIGIBLE
+  │   norm = reparameterize(mu, sigma)               │     randn PER COPY ⇒ 4 distinct latents
+  │   x_purb = layer_purturbation(norm)              │     from identical inputs (runs in BOTH modes)
   └────────────────────────────────────────────────┘
         ▼  x = x_purb + x  →  decoder (upsample → layer4 → patchrecovery)
         ▼
    output: M×4 forecasts ───────────────────────────────┐
                                                          │
-  target state ─► ENCODER 2 (posterior)                  │  ← TRAIN ONLY, activation-checkpointed
-    target_surface/upper_air     mu_e2 = layer_mu_e2(…)   │
-                                 sigma_e2 = layer_sigma_e2(…)
+  target state ─► ENCODER 2 (posterior)                  │  ← TRAIN ONLY · FULL ~14-block stack
+    target_surface/upper_air     mu_e2 = layer_mu_e2(…)   │     checkpointed; ≈ doubles encoder
+                                 sigma_e2 = layer_sigma_e2(…)    compute (fwd 40–70 / bwd 60–100 ms)
             ┌─────────────────────────────┘              │
             ▼                                             ▼
    KL(E1 ‖ E2)                                   CRPS  (Latitude_weighted_CRPSLoss)
@@ -289,13 +290,15 @@ The VAE generates 4 ensemble members by repeating each input 4× and injecting d
 
   for ens_id in range(2):   (inference[_optimized].py — hardcoded 2; config ignored)
         ▼
-   forward(train=False) ─► ENCODER 1 only → reparameterize → fresh noise
-        │                  (Encoder 2, target inputs, and KL all skipped)
+   forward(train=False) ─► ENCODER 1 HEAD only → reparameterize → fresh noise
+        │                  (shared trunk still runs; Encoder 2 + target + KL skipped)
         ▼
    autoregressive rollout over inference_steps  →  save_prediction(ens_id)  (one NetCDF/member)
 
-  ⇒ training: 4 members in ONE batched forward (×4 repeat + per-copy noise)
-    inference: 2 members from SEPARATE sequential rollouts (different noise each pass)
+  ⇒ Encoder 1 = tiny 1×1-conv sampling head (cheap, both modes);
+    Encoder 2 = a full second encoder stack (expensive, train-only) — the cost in §6's table.
+    training: 4 members in ONE batched forward (×4 repeat + per-copy noise);
+    inference: 2 members from SEPARATE sequential rollouts (different noise each pass).
 ```
 
 **What the KL loss does.** The loss is `KL(Encoder1 ‖ Encoder2)` between two *learned* Gaussians — not against a fixed N(0,1). At inference only Encoder 1 runs, sampling noise that (if KL training worked) resembles what Encoder 2 would have produced from tomorrow's weather. Encoder 2 is a training-time teacher with no inference role.
@@ -306,14 +309,14 @@ KL = 0.5 × (logvar_p − logvar_q + (var_q + (μ_q − μ_p)²) / var_p − 1)
 ```
 and its gradient w.r.t. Encoder 1's log-variance, `0.5 × (−1 + var_q/var_p)`, *does* resist collapse (it goes negative as `var_q → 0`). But scaled by 0.0001 the anti-collapse gradient is at most ~0.0005 while the CRPS gradient is order 1 — the forecast loss outweighs KL by ~2,000–20,000:1 at the gradient level, so collapse proceeds despite the correct formula. Two failure modes follow: Encoder 1 never learns to imitate Encoder 2, and its variance may collapse toward zero (near-identical ensemble members).
 
-**Cost of the second encoder.** It mirrors the main encoder's first three stages (14 transformer blocks of the `[2,6,6,2]` depths) on the target data, sharing one GPU stream. From the 194 ms baseline forward:
+**Cost of the second encoder.** First, the clarification the costs hinge on: the two "encoders" are very different sizes. The **VAE prior head ("Encoder 1") is just three 1×1 convolutions** (`layer_mu`, `layer_sigma`, `layer_purturbation`) sitting on the shared main-encoder trunk's output — its forward and backward are negligible. The **"second encoder" ("Encoder 2") is a full parallel transformer stack** (`layer1_e2 → downsample_e2 → layer2_e2 → layer3_e3`, ~14 `EarthSpecificLayer` blocks mirroring the main encoder's `[2,6,6,2]` depths) that re-encodes the *target* from scratch — that is the expensive part, and the only one this table is about. From the 194 ms baseline forward:
 
 | Component | Forward | Backward (no recomputation) | Total per step |
 |---|---|---|---|
 | Second encoder (estimated) | 40–70 ms | 60–100 ms | **100–170 ms** |
 | As fraction of step time | 6–11% | 9–15% | **15–25%** |
 
-**Why the backward pass is the larger half.** The second encoder runs only during training and is thrown away at inference — but "discarded later" does not make it cheap now. While the model is training it is a full, trainable 14-block stack, so on every step the optimiser has to push gradients backward through all of its layers — both to update the second encoder's own weights and to generate the signal that teaches the forecast encoder (Encoder 1) which distribution to aim for. And a backward pass is inherently more work than a forward pass: the forward computes each layer's output once, whereas the backward computes *two* things at each layer — how to adjust that layer's inputs and how to adjust its weights — so it runs at roughly 1.5× the forward time. The result is that most of the second encoder's cost is its backward pass, and that entire cost buys nothing at run time, where only the forecast encoder (Encoder 1) executes. (Encoder 1, by contrast, is paid for in both training and inference, because it is the network that actually produces the forecast.)
+**Why the backward pass is the larger half.** The second encoder runs only during training and is thrown away at inference — but "discarded later" does not make it cheap now. While the model is training it is a full, trainable 14-block stack, so on every step the optimiser has to push gradients backward through all of its layers — both to update the second encoder's own weights and to generate the signal that teaches the forecast encoder (Encoder 1) which distribution to aim for. And a backward pass is inherently more work than a forward pass: the forward computes each layer's output once, whereas the backward computes *two* things at each layer — how to adjust that layer's inputs and how to adjust its weights — so it runs at roughly 1.5× the forward time. The result is that most of the second encoder's cost is its backward pass, and that entire cost buys nothing at run time, where Encoder 2 does not run. (Encoder 1 — the 1×1-conv head — is negligible in both modes; the compute the forecast actually requires lives in the *shared* main trunk, which both training and inference pay regardless. So the second encoder's ~15–25% is genuinely *extra*, not a cost the forecast needs.)
 
 So the second encoder costs an estimated **15–25% of total step time** at batch 1 — it roughly doubles the encoder workload. These are still estimates: the `vae_encoder1`/`vae_encoder2` NVTX markers needed to measure them directly are already in `pangu.py` (gated by `S2S_NVTX=1`, which `midway_bench_nsys.sh` sets), but a **training** nsys profile capturing them has not been re-run on pedramh-gpu yet — the existing training profile predates the markers (it has only NCCL ranges). Note this is a *training*-side measurement: the second encoder never runs at inference, so the pending inference profile (Part I, footnote 7) cannot capture it. A fresh `midway_bench_nsys.sh` run on pedramh-gpu would replace these estimates with measured values. If the collapse test confirms the second encoder isn't producing a useful signal (likely at this KL weight), removing it recovers ~15–25% of step time at no quality cost.
 
