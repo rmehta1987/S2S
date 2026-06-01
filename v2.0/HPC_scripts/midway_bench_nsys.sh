@@ -27,12 +27,22 @@
 
 ulimit -l unlimited
 
+# `module purge` first: a Python module inherited from the submit environment can
+# conflict with miniforge ("cannot be loaded due to a conflict"), silently leaving
+# the system anaconda active and crashing every rank with ModuleNotFoundError.
+module purge 2>/dev/null || true
 module load python/miniforge-25.3.0
 eval "$(mamba shell hook --shell bash)"
 mamba activate /project/pedramh/shared/S2S/v2.0/venv
 
-module unload cuda
 module load cuda/12.6
+
+# Fail fast if the venv did not actually activate — otherwise torchrun falls back
+# to system Python, every rank dies on `import wandb`, and nsys writes a junk profile.
+python -c "import torch, wandb" 2>/dev/null || {
+    echo "FATAL: venv not active (python=$(command -v python)); aborting before launch."
+    exit 1
+}
 
 unset NCCL_DEBUG
 unset TORCH_DISTRIBUTED_DEBUG
