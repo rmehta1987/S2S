@@ -21,16 +21,13 @@
 # Output: ${SLURM_SUBMIT_DIR}/nsys_bench_<run_num>.nsys-rep
 # To analyse on Midway after the job:
 #   nsys stats nsys_bench_<run_num>.nsys-rep
-#   
+#
 #   # then scp the .sqlite to your laptop and open with nsys-ui,
 #   # or query it with sqlite3 (see bench_methodology.md for queries).
 
 ulimit -l unlimited
 
-# `module purge` first: a Python module inherited from the submit environment can
-# conflict with miniforge ("cannot be loaded due to a conflict"), silently leaving
-# the system anaconda active and crashing every rank with ModuleNotFoundError.
-module purge 2>/dev/null || true
+module unload python
 module load python/miniforge-25.3.0
 eval "$(mamba shell hook --shell bash)"
 mamba activate /project/pedramh/shared/S2S/v2.0/venv

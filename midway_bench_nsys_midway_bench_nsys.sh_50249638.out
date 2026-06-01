@@ -1,81 +1,0 @@
-=== midway_bench_nsys: 2026-05-31T09:32:48-05:00 ===
-JOB_ID=50249638  NODELIST=midway3-0423
-GPU 0: NVIDIA H100 NVL (UUID: GPU-28b2b7c3-e2d1-a02b-8b29-e26d8fc62d7e)
-GPU 1: NVIDIA H100 NVL (UUID: GPU-3cb41d14-59de-436f-4ede-557b7cfa0f44)
-GPU 2: NVIDIA H100 NVL (UUID: GPU-e89e6f5a-4b64-6160-1fbd-efc0a1258d81)
-GPU 3: NVIDIA H100 NVL (UUID: GPU-50d312fb-8028-bea0-87e1-795d7e643bb6)
-NUM_GPUS=4  run_num=nsys_bench_1780237968
-nsys output: /project/pedramh/shared/S2S/nsys_bench_nsys_bench_1780237968.nsys-rep
-World rank: 0
-World rank: 3
-World rank: 1
-World rank: 2
-This is the starting point f
-Has diagnostic: True
-World size from OS: 4
-This is the starting point f
-Has diagnostic: True
-World size from OS: 4
-This is the starting point f
-Has diagnostic: True
-World size from OS: 4
-This is the starting point f
-Has diagnostic: True
-World size from OS: 4
-World size from Cuda: 4
-World size from Cuda: 4
-World size from Cuda: 4
-World size from Cuda: 4
-NVIDIA H100 NVL
-Memory Allocated: 0.00 MB
-Memory Cached: 0.00 MB
-4
-NVIDIA H100 NVL
-Memory Allocated: 0.00 MB
-Memory Cached: 0.00 MB
-4
-NVIDIA H100 NVL
-Memory Allocated: 0.00 MB
-Memory Cached: 0.00 MB
-4NVIDIA H100 NVL
-
-Memory Allocated: 0.00 MB
-Memory Cached: 0.00 MB
-4
-Using PyTorch native
-Using PyTorch native
-Using PyTorch native
-Using PyTorch native
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-mask_output is False. Land variables output will not be masked.
-mask_output is False. Ocean variables output will not be masked.
-Pad sizes in 3D patch embedding
-(0, 0, 0, 0, 1, 0)
-Patch Size
-[2, 4, 4]
-Capture range started in the application.
-Capture range ended in the application.
-Generating '/scratch/local/jobs/50249638/nsys-report-bb7e.qdstrm'
-[1/1] [0%                          ] nsys_bench_nsys_bench_1780237968.nsys-repProcessing events...
-[1/1] [0%                          ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [8%                          ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [10%                         ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [14%                         ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==19%                       ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===24%                      ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=====29%                    ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [======34%                   ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=======38%                  ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=========43%                ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=========46%                ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==========47%               ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==========48%               ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==========49%               ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===========50%              ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===========51%              ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===========52%              ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===========53%              ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [============54%             ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [============55%             ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [============56%             ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [============57%             ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=============58%            ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=============59%            ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=============60%            ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==============61%           ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==============62%           ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==============63%           ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===============65%          ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===============66%          ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===============67%          ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [================68%         ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [================69%         ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [================70%         ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=================72%        ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=================73%        ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=================74%        ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==================75%       ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==================76%       ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [==================78%       ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===================79%      ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===================80%      ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===================81%      ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [===================82%      ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [====================83%     ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [====================85%     ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=====================86%    ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=====================87%    ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=====================88%    ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=====================89%    ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [======================91%   ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [======================92%   ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=======================93%  ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=======================94%  ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [=======================95%  ] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [========================100%] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [========================100%] nsys_bench_nsys_bench_1780237968.nsys-rep[1/1] [========================100%] nsys_bench_nsys_bench_1780237968.nsys-rep
-Generated:
-    /project/pedramh/shared/S2S/nsys_bench_nsys_bench_1780237968.nsys-rep
-Profile written: /project/pedramh/shared/S2S/nsys_bench_nsys_bench_1780237968.nsys-rep
-scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep
