@@ -73,6 +73,34 @@ import torch.cuda.nvtx as nvtx
 # Mirrors S2S_NVTX in train.py — set the same env var to activate ranges here.
 _NVTX = os.environ.get("S2S_NVTX") == "1"
 
+
+# Identity autograd ops that push/pop an NVTX range *during the backward pass*, so
+# the second encoder's backward can be bracketed the way `nvtx.range_push` brackets
+# the forward. Insert the Push op at the chunk's forward OUTPUT (its backward runs
+# first, when grad enters the chunk) and the Pop op at the chunk's forward INPUT
+# (its backward runs last, when grad leaves). Profiling-only — applied solely when
+# _NVTX is set, so there is zero effect on normal training/inference.
+class _NvtxBackwardPush(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        return x
+
+    @staticmethod
+    def backward(ctx, grad):
+        nvtx.range_push("vae_encoder2_bwd")
+        return grad
+
+
+class _NvtxBackwardPop(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        return x
+
+    @staticmethod
+    def backward(ctx, grad):
+        nvtx.range_pop()
+        return grad
+
 # Global flag for using Transformer Engine, initially set to True
 USE_TE = False
 
@@ -513,8 +541,14 @@ class PanguModel_Plasim(nn.Module):
         if train:
             ###########VAE Encoder 2 (posterior — training only, always checkpointed)#################
             if _NVTX: nvtx.range_push("vae_encoder2")
+            # Backward-pass NVTX: Pop op at the chunk input (its backward runs last),
+            # Push op at the chunk output (its backward runs first) — together they
+            # bracket the backward of layer2_e2 + layer3_e3 (incl. checkpoint recompute)
+            # under the range "vae_encoder2_bwd", matching the forward "vae_encoder2".
+            if _NVTX: x_e2 = _NvtxBackwardPop.apply(x_e2)
             x_e2 = checkpoint(self.layer2_e2, x_e2, use_reentrant=self.use_reentrant)
             x_e2 = checkpoint(self.layer3_e3, x_e2, use_reentrant=self.use_reentrant)
+            if _NVTX: x_e2 = _NvtxBackwardPush.apply(x_e2)
             x_e2_vae = x_e2.reshape(B, self.downscale_resolution[0], self.downscale_resolution[1], self.downscale_resolution[2], -1).permute(0, 4, 1, 2, 3)
             mu_e2 = self.layer_mu_e2(x_e2_vae)
             sigma_e2 = self.layer_sigma_e2(x_e2_vae)
