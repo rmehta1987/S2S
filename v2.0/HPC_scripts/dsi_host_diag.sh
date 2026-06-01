@@ -2,7 +2,7 @@
 #
 # dsi_host_diag.sh — host diagnostic for the S2S CPU-to-GPU investigation.
 #
-# Captures the read-only §6 diagnostic block from v2.0/bench_report.md, 
+# Captures the read-only §6 diagnostic block from v2.0/bench_report.md,
 #   1. the PyTorch / CUDA version line printed nothing (wrong interpreter / torch
 #      not importable in that shell) — now tries python3 then python and shows the error;
 #   2. numactl was not installed — now falls back to sysfs + lscpu for NUMA topology;
@@ -31,7 +31,10 @@ pf()  { printf '\n========== %s ==========\n' "$*"; }
 run() { printf '\n$ %s\n' "$*"; eval "$* 2>&1" || printf '(command failed, rc=%s)\n' "$?"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# Everything below runs inside main() 
+module unload cuda
+module load cuda/12.9
+
+# Everything below runs inside main()
 main() {
   pf "Host identity, kernel, uptime"
   run "date"
