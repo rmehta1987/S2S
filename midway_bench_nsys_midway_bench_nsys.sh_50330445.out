@@ -1,0 +1,12 @@
+=== midway_bench_nsys: 2026-05-31T22:54:28-05:00 ===
+JOB_ID=50330445  NODELIST=midway3-0423
+GPU 0: NVIDIA H100 NVL (UUID: GPU-28b2b7c3-e2d1-a02b-8b29-e26d8fc62d7e)
+GPU 1: NVIDIA H100 NVL (UUID: GPU-3cb41d14-59de-436f-4ede-557b7cfa0f44)
+GPU 2: NVIDIA H100 NVL (UUID: GPU-e89e6f5a-4b64-6160-1fbd-efc0a1258d81)
+GPU 3: NVIDIA H100 NVL (UUID: GPU-50d312fb-8028-bea0-87e1-795d7e643bb6)
+NUM_GPUS=4  run_num=nsys_bench_1780286068
+nsys output: /project/pedramh/shared/S2S/nsys_bench_eager_nsys_bench_1780286068.nsys-rep
+Processing events...
+Generated:
+Profile written: /project/pedramh/shared/S2S/nsys_bench_eager_nsys_bench_1780286068.nsys-rep
+scp the .nsys-rep locally and run: nsys export --type=sqlite <file>.nsys-rep
