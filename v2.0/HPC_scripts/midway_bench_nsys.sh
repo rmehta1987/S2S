@@ -48,13 +48,20 @@ export MKL_NUM_THREADS=2
 
 # Bench knobs — must match midway_bench.sh so results are comparable.
 export S2S_BENCH=1
-export S2S_BENCH_WARMUP=40   # raised from 20: compiled steps are slow until Triton kernels settle
+export S2S_BENCH_WARMUP=20   # eager run (no torch.compile) — no Triton warmup needed
 export S2S_BENCH_STEPS=80
 export S2S_NVTX=1            # activate NVTX ranges + cudaProfilerStart/Stop
 
 # Match the same optimisation flags as midway_bench.sh.
 export S2S_AMP_DTYPE=bf16
-export TORCH_COMPILE_MODE=reduce-overhead
+# torch.compile DISABLED for this profiling run. reduce-overhead (CUDA graphs)
+# segfaults at teardown on this DDP + nsys setup ("CUDA Graph is empty"), and CUDA-
+# graph kernels are not recorded in CUPTI_ACTIVITY_KIND_KERNEL (the kernel table
+# goes missing), which breaks the NVTX->kernel correlation needed for the
+# vae_encoder cost. Eager is also the correct basis: the bench_report.md
+# second-encoder estimates are from the eager 194 ms forward. Re-enable only once
+# reduce-overhead is graph-break-clean on this model.
+# export TORCH_COMPILE_MODE=reduce-overhead
 
 export S2S_BENCH_CSV="${SLURM_SUBMIT_DIR}/bench_results.csv"
 
@@ -71,7 +78,7 @@ nvidia-smi -L
 NUM_GPUS=$(nvidia-smi -L | wc -l)
 echo "NUM_GPUS=${NUM_GPUS}  run_num=${run_num}"
 
-NSYS_OUT="${SLURM_SUBMIT_DIR}/nsys_bench_${run_num}"
+NSYS_OUT="${SLURM_SUBMIT_DIR}/nsys_bench_eager_${run_num}"
 echo "nsys output: ${NSYS_OUT}.nsys-rep"
 
 nsys profile \

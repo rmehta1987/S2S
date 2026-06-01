@@ -14,6 +14,9 @@ FILES = {
     # at restore_checkpoint and held only ~3-4k runtime events, no kernel table).
     "MIDWAY_INTEL_4GPU_POSTFIX": "/home/rmeht/Projects/S2S/test_partition_benchmarks/midway_h200_intel_4gpus_inference_50244406_2026-05-29.sqlite",
     "MIDWAY_AMD_4GPU_POSTFIX": "/home/rmeht/Projects/S2S/test_partition_benchmarks/midway_h200_amd_4gpus_inference_50244404_2026-05-29.sqlite",
+    # pedramh-gpu H100 NVL inference, post-fix re-run (2026-05-31, job 50249569,
+    # standardized midway_infer_nsys.sh). Fills the matrix's pedramh row.
+    "PEDRAMH_H100_4GPU": "/home/rmeht/Projects/S2S/test_partition_benchmarks/midway_h100_4gpus_inference_50249569_2026-05-31.sqlite",
 }
 
 

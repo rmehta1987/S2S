@@ -52,11 +52,13 @@ export S2S_BENCH_STEPS=80
 # Verify no NaN by checking scaler_skips=0 in fp16 first (baseline does this).
 export S2S_AMP_DTYPE=bf16
 
-# torch.compile: reduce-overhead fuses element-wise kernels; max-autotune maximises throughput.
-# Warmup raised to 40 so the JIT graph capture and Triton kernel compilation settle
-# before timing starts — first few compiled steps are much slower than steady state.
-export TORCH_COMPILE_MODE=reduce-overhead
-export S2S_BENCH_WARMUP=40
+# torch.compile DISABLED: reduce-overhead (CUDA graphs) segfaults at DDP teardown on
+# this model ("CUDA Graph is empty") and drops the CUPTI kernel table — see
+# midway_bench_nsys.sh for the full note. The committed bench_results.csv baselines
+# were collected without effective compilation, so they are unaffected. Re-enable
+# (and restore the warmup-40 for Triton settling) only once it is graph-break-clean.
+# export TORCH_COMPILE_MODE=reduce-overhead
+# export S2S_BENCH_WARMUP=40   # use 40 (not 20) when re-enabling compile
 
 # CSV / env side-car location. Resolves to absolute path so it doesn't depend on cwd.
 export S2S_BENCH_CSV="${SLURM_SUBMIT_DIR}/bench_results.csv"
