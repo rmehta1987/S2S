@@ -1,0 +1,457 @@
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/models/layers/__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+2026-05-31 09:33:07,697 - root - INFO - Torch version: 2.6.0+cu124
+2026-05-31 09:33:07,697 - root - INFO - Torch version: 2.6.0+cu124
+2026-05-31 09:33:07,697 - root - INFO - Torch version: 2.6.0+cu124
+2026-05-31 09:33:07,697 - root - INFO - Torch version: 2.6.0+cu124
+2026-05-31 09:33:10,680 - root - INFO - --------------- Versions ---------------
+2026-05-31 09:33:10,681 - root - INFO - Torch: 2.6.0+cu124
+2026-05-31 09:33:10,681 - root - INFO - ----------------------------------------
+2026-05-31 09:33:10,681 - root - INFO - ------------------ Configuration ------------------
+2026-05-31 09:33:10,681 - root - INFO - Configuration file: /project/pedramh/shared/S2S/v2.0/config/exp2.yaml
+2026-05-31 09:33:10,681 - root - INFO - Configuration name: S2S
+2026-05-31 09:33:10,682 - root - INFO - data_dir /project/pedramh/h5data/h5data
+2026-05-31 09:33:10,682 - root - INFO - upper_air_variables ['temperature', 'u_component_of_wind', 'v_component_of_wind', 'specific_humidity', 'geopotential']
+2026-05-31 09:33:10,682 - root - INFO - surface_variables ['2m_temperature', '10m_u_component_of_wind', '10m_v_component_of_wind', 'mean_sea_level_pressure', 'surface_pressure']
+2026-05-31 09:33:10,682 - root - INFO - diagnostic_variables ['total_precipitation_24hr', 'mean_top_net_long_wave_radiation_flux']
+2026-05-31 09:33:10,682 - root - INFO - land_variables ['volumetric_soil_water_layer_1', 'soil_temperature_level_1', 'skin_temperature']
+2026-05-31 09:33:10,682 - root - INFO - ocean_variables ['sea_surface_temperature']
+2026-05-31 09:33:10,682 - root - INFO - constant_boundary_variables ['land_sea_mask', 'geopotential_at_surface']
+2026-05-31 09:33:10,682 - root - INFO - varying_boundary_variables ['toa_incident_solar_radiation']
+2026-05-31 09:33:10,683 - root - INFO - mask_fill {'volumetric_soil_water_layer_1': 0.0, 'soil_temperature_level_1': 270.0, 'skin_temperature': 270.0, 'sea_surface_temperature': 270.0, 'sea_ice_cover': 0.0, 'snow_depth': 0.0}
+2026-05-31 09:33:10,683 - root - INFO - mask_output False
+2026-05-31 09:33:10,683 - root - INFO - train_year_start 2020
+2026-05-31 09:33:10,683 - root - INFO - train_year_end 2021
+2026-05-31 09:33:10,683 - root - INFO - val_year_start 2020
+2026-05-31 09:33:10,683 - root - INFO - val_year_end 2021
+2026-05-31 09:33:10,683 - root - INFO - data_timedelta_hours 6
+2026-05-31 09:33:10,683 - root - INFO - surface_mean pangu_s2s_1979-2018_surface_mean.nc
+2026-05-31 09:33:10,683 - root - INFO - surface_std pangu_s2s_1979-2018_surface_std.nc
+2026-05-31 09:33:10,683 - root - INFO - surface_ff_std pangu_s2s_1979-2018_surface_std.nc
+2026-05-31 09:33:10,684 - root - INFO - upper_air_mean pangu_s2s_1979-2018_mean.nc
+2026-05-31 09:33:10,684 - root - INFO - upper_air_std pangu_s2s_1979-2018_std.nc
+2026-05-31 09:33:10,684 - root - INFO - upper_air_ff_std pangu_s2s_1979-2018_std.nc
+2026-05-31 09:33:10,684 - root - INFO - boundary_mean pangu_s2s_1979-2018_surface_mean.nc
+2026-05-31 09:33:10,684 - root - INFO - boundary_std pangu_s2s_1979-2018_surface_std.nc
+2026-05-31 09:33:10,684 - root - INFO - diagnostic_mean pangu_s2s_1979-2018_surface_mean.nc
+2026-05-31 09:33:10,684 - root - INFO - diagnostic_std pangu_s2s_1979-2018_surface_std.nc
+2026-05-31 09:33:10,684 - root - INFO - climatology_file 1979-2018_mean_climatology.nc
+2026-05-31 09:33:10,684 - root - INFO - calendar standard
+2026-05-31 09:33:10,684 - root - INFO - timedelta_hours 24
+2026-05-31 09:33:10,685 - root - INFO - batch_size 2
+2026-05-31 09:33:10,685 - root - INFO - max_epochs 2
+2026-05-31 09:33:10,685 - root - INFO - has_year_zero False
+2026-05-31 09:33:10,685 - root - INFO - num_levels 17upper_air_boundary
+2026-05-31 09:33:10,685 - root - INFO - levels [5, 10, 20, 30, 50, 70, 100, 150, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
+2026-05-31 09:33:10,685 - root - INFO - horizontal_resolution [180, 360]
+2026-05-31 09:33:10,685 - root - INFO - depths [2, 6, 6, 2]
+2026-05-31 09:33:10,685 - root - INFO - predict_delta False
+2026-05-31 09:33:10,685 - root - INFO - patch_size [2, 4, 4]
+2026-05-31 09:33:10,685 - root - INFO - updown_scale_factor 2
+2026-05-31 09:33:10,686 - root - INFO - window_size [2, 6, 12]
+2026-05-31 09:33:10,686 - root - INFO - epsilon_factor 0
+2026-05-31 09:33:10,686 - root - INFO - upper_air_boundary False
+2026-05-31 09:33:10,687 - root - INFO - subpixel_deconv True
+2026-05-31 09:33:10,687 - root - INFO - recovery_head True
+2026-05-31 09:33:10,688 - root - INFO - diagnostic_head False
+2026-05-31 09:33:10,688 - root - INFO - vertical_windowing True
+2026-05-31 09:33:10,688 - root - INFO - train_year_to_year False
+2026-05-31 09:33:10,688 - root - INFO - diagnostic_acc False
+2026-05-31 09:33:10,688 - root - INFO - diagnostic_gif False
+2026-05-31 09:33:10,688 - root - INFO - diagnostic_spectra False
+2026-05-31 09:33:10,688 - root - INFO - forecast_lead_times [1, 3, 5, 10, 15, 45]
+2026-05-31 09:33:10,688 - root - INFO - diagnostic_logs True
+2026-05-31 09:33:10,688 - root - INFO - lev plev
+2026-05-31 09:33:10,688 - root - INFO - num_inferences 10000
+2026-05-31 09:33:10,689 - root - INFO - use_reentrant False
+2026-05-31 09:33:10,689 - root - INFO - checkpointing 2
+2026-05-31 09:33:10,689 - root - INFO - lat [-89.5, -88.5, -87.5, -86.5, -85.5, -84.5, -83.5, -82.5, -81.5, -80.5, -79.5, -78.5, -77.5, -76.5, -75.5, -74.5, -73.5, -72.5, -71.5, -70.5, -69.5, -68.5, -67.5, -66.5, -65.5, -64.5, -63.5, -62.5, -61.5, -60.5, -59.5, -58.5, -57.5, -56.5, -55.5, -54.5, -53.5, -52.5, -51.5, -50.5, -49.5, -48.5, -47.5, -46.5, -45.5, -44.5, -43.5, -42.5, -41.5, -40.5, -39.5, -38.5, -37.5, -36.5, -35.5, -34.5, -33.5, -32.5, -31.5, -30.5, -29.5, -28.5, -27.5, -26.5, -25.5, -24.5, -23.5, -22.5, -21.5, -20.5, -19.5, -18.5, -17.5, -16.5, -15.5, -14.5, -13.5, -12.5, -11.5, -10.5, -9.5, -8.5, -7.5, -6.5, -5.5, -4.5, -3.5, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5, 20.5, 21.5, 22.5, 23.5, 24.5, 25.5, 26.5, 27.5, 28.5, 29.5, 30.5, 31.5, 32.5, 33.5, 34.5, 35.5, 36.5, 37.5, 38.5, 39.5, 40.5, 41.5, 42.5, 43.5, 44.5, 45.5, 46.5, 47.5, 48.5, 49.5, 50.5, 51.5, 52.5, 53.5, 54.5, 55.5, 56.5, 57.5, 58.5, 59.5, 60.5, 61.5, 62.5, 63.5, 64.5, 65.5, 66.5, 67.5, 68.5, 69.5, 70.5, 71.5, 72.5, 73.5, 74.5, 75.5, 76.5, 77.5, 78.5, 79.5, 80.5, 81.5, 82.5, 83.5, 84.5, 85.5, 86.5, 87.5, 88.5, 89.5]
+2026-05-31 09:33:10,689 - root - INFO - lon [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0, 41.0, 42.0, 43.0, 44.0, 45.0, 46.0, 47.0, 48.0, 49.0, 50.0, 51.0, 52.0, 53.0, 54.0, 55.0, 56.0, 57.0, 58.0, 59.0, 60.0, 61.0, 62.0, 63.0, 64.0, 65.0, 66.0, 67.0, 68.0, 69.0, 70.0, 71.0, 72.0, 73.0, 74.0, 75.0, 76.0, 77.0, 78.0, 79.0, 80.0, 81.0, 82.0, 83.0, 84.0, 85.0, 86.0, 87.0, 88.0, 89.0, 90.0, 91.0, 92.0, 93.0, 94.0, 95.0, 96.0, 97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0, 121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0, 134.0, 135.0, 136.0, 137.0, 138.0, 139.0, 140.0, 141.0, 142.0, 143.0, 144.0, 145.0, 146.0, 147.0, 148.0, 149.0, 150.0, 151.0, 152.0, 153.0, 154.0, 155.0, 156.0, 157.0, 158.0, 159.0, 160.0, 161.0, 162.0, 163.0, 164.0, 165.0, 166.0, 167.0, 168.0, 169.0, 170.0, 171.0, 172.0, 173.0, 174.0, 175.0, 176.0, 177.0, 178.0, 179.0, 180.0, 181.0, 182.0, 183.0, 184.0, 185.0, 186.0, 187.0, 188.0, 189.0, 190.0, 191.0, 192.0, 193.0, 194.0, 195.0, 196.0, 197.0, 198.0, 199.0, 200.0, 201.0, 202.0, 203.0, 204.0, 205.0, 206.0, 207.0, 208.0, 209.0, 210.0, 211.0, 212.0, 213.0, 214.0, 215.0, 216.0, 217.0, 218.0, 219.0, 220.0, 221.0, 222.0, 223.0, 224.0, 225.0, 226.0, 227.0, 228.0, 229.0, 230.0, 231.0, 232.0, 233.0, 234.0, 235.0, 236.0, 237.0, 238.0, 239.0, 240.0, 241.0, 242.0, 243.0, 244.0, 245.0, 246.0, 247.0, 248.0, 249.0, 250.0, 251.0, 252.0, 253.0, 254.0, 255.0, 256.0, 257.0, 258.0, 259.0, 260.0, 261.0, 262.0, 263.0, 264.0, 265.0, 266.0, 267.0, 268.0, 269.0, 270.0, 271.0, 272.0, 273.0, 274.0, 275.0, 276.0, 277.0, 278.0, 279.0, 280.0, 281.0, 282.0, 283.0, 284.0, 285.0, 286.0, 287.0, 288.0, 289.0, 290.0, 291.0, 292.0, 293.0, 294.0, 295.0, 296.0, 297.0, 298.0, 299.0, 300.0, 301.0, 302.0, 303.0, 304.0, 305.0, 306.0, 307.0, 308.0, 309.0, 310.0, 311.0, 312.0, 313.0, 314.0, 315.0, 316.0, 317.0, 318.0, 319.0, 320.0, 321.0, 322.0, 323.0, 324.0, 325.0, 326.0, 327.0, 328.0, 329.0, 330.0, 331.0, 332.0, 333.0, 334.0, 335.0, 336.0, 337.0, 338.0, 339.0, 340.0, 341.0, 342.0, 343.0, 344.0, 345.0, 346.0, 347.0, 348.0, 349.0, 350.0, 351.0, 352.0, 353.0, 354.0, 355.0, 356.0, 357.0, 358.0, 359.0]
+2026-05-31 09:33:10,689 - root - INFO - loss weightedCRPS
+2026-05-31 09:33:10,689 - root - INFO - lr 0.0001
+2026-05-31 09:33:10,689 - root - INFO - weight_decay 3e-06
+2026-05-31 09:33:10,689 - root - INFO - scheduler OneCycleLR
+2026-05-31 09:33:10,690 - root - INFO - num_data_workers 8
+2026-05-31 09:33:10,690 - root - INFO - oc_pct_start 0.1
+2026-05-31 09:33:10,690 - root - INFO - oc_div_factor 100000.0
+2026-05-31 09:33:10,690 - root - INFO - oc_final_div_factor 0.00025
+2026-05-31 09:33:10,690 - root - INFO - log_to_screen True
+2026-05-31 09:33:10,690 - root - INFO - log_to_wandb True
+2026-05-31 09:33:10,690 - root - INFO - save_checkpoint True
+2026-05-31 09:33:10,690 - root - INFO - optimizer_type Adam
+2026-05-31 09:33:10,690 - root - INFO - plot_animations False
+2026-05-31 09:33:10,690 - root - INFO - nettype pangu_plasim
+2026-05-31 09:33:10,690 - root - INFO - group s2s-dev
+2026-05-31 09:33:10,691 - root - INFO - exp_dir results
+2026-05-31 09:33:10,691 - root - INFO - fresh_start True
+2026-05-31 09:33:10,691 - root - INFO - use_transformer_engine False
+2026-05-31 09:33:10,691 - root - INFO - early_stopping False
+2026-05-31 09:33:10,691 - root - INFO - project Pangu-S2S
+2026-05-31 09:33:10,691 - root - INFO - name S2S-2Stamp
+2026-05-31 09:33:10,691 - root - INFO - entity binggong
+2026-05-31 09:33:10,691 - root - INFO - vae_loss True
+2026-05-31 09:33:10,691 - root - INFO - vae_loss_weight 0.0001
+2026-05-31 09:33:10,691 - root - INFO - mode train
+2026-05-31 09:33:10,691 - root - INFO - num_ensemble_members 4
+2026-05-31 09:33:10,691 - root - INFO - test_iterations 2200000000
+2026-05-31 09:33:10,692 - root - INFO - checkpoint_path results/S2S/nsys_bench_1780237968/training_checkpoints/ckpt.tar
+2026-05-31 09:33:10,692 - root - INFO - run_iter 1
+2026-05-31 09:33:10,692 - root - INFO - has_diagnostic True
+2026-05-31 09:33:10,692 - root - INFO - world_size 4
+2026-05-31 09:33:10,692 - root - INFO - global_batch_size 8
+2026-05-31 09:33:10,692 - root - INFO - experiment_dir /project/pedramh/shared/S2S/results/S2S/nsys_bench_1780237968
+2026-05-31 09:33:10,692 - root - INFO - best_checkpoint_path results/S2S/nsys_bench_1780237968/training_checkpoints/best_ckpt.tar
+2026-05-31 09:33:10,692 - root - INFO - resuming False
+2026-05-31 09:33:10,692 - root - INFO - local_rank 0
+2026-05-31 09:33:10,692 - root - INFO - ---------------------------------------------------
+2026-05-31 09:33:11,361 - root - INFO - rank 2, begin data loader init
+2026-05-31 09:33:11,389 - root - INFO - rank 3, begin data loader init
+2026-05-31 09:33:11,389 - root - INFO - rank 0, begin data loader init
+2026-05-31 09:33:11,390 - root - INFO - rank 1, begin data loader init
+2026-05-31 09:33:12,299 - root - INFO - Ensemble Mode. Ensemble size = {params.num_ensemble_members}
+
+2026-05-31 09:33:12,299 - root - INFO - Ensemble Mode. Ensemble size = {params.num_ensemble_members}
+
+2026-05-31 09:33:12,299 - root - INFO - Ensemble Mode. Ensemble size = {params.num_ensemble_members}
+
+2026-05-31 09:33:12,299 - root - INFO - Ensemble Mode. Ensemble size = {params.num_ensemble_members}
+
+2026-05-31 09:33:12,760 - root - INFO - rank 0, data loader initialized
+2026-05-31 09:33:12,763 - root - INFO - The output directories /project/pedramh/shared/S2S/spectra_out/bdb3ab14-76a9-4f77-91dd-0bb88a496771 ; /project/pedramh/shared/S2S/gif_out/bdb3ab14-76a9-4f77-91dd-0bb88a496771; /project/pedramh/shared/S2S/acc_plots/bdb3ab14-76a9-4f77-91dd-0bb88a496771
+2026-05-31 09:33:12,763 - root - INFO - Params
+2026-05-31 09:33:12,763 - root - INFO - The output directories /project/pedramh/shared/S2S/spectra_out/b83642a4-bb8e-48d5-8380-0a164501d5b9 ; /project/pedramh/shared/S2S/gif_out/b83642a4-bb8e-48d5-8380-0a164501d5b9; /project/pedramh/shared/S2S/acc_plots/b83642a4-bb8e-48d5-8380-0a164501d5b9
+2026-05-31 09:33:12,763 - root - INFO - The output directories /project/pedramh/shared/S2S/spectra_out/0ed38940-5a0a-4a87-9fa7-5d7c9248080e ; /project/pedramh/shared/S2S/gif_out/0ed38940-5a0a-4a87-9fa7-5d7c9248080e; /project/pedramh/shared/S2S/acc_plots/0ed38940-5a0a-4a87-9fa7-5d7c9248080e
+2026-05-31 09:33:12,764 - root - INFO - The output directories /project/pedramh/shared/S2S/spectra_out/de7c53db-9ac6-4a7c-98b3-30eff14a2452 ; /project/pedramh/shared/S2S/gif_out/de7c53db-9ac6-4a7c-98b3-30eff14a2452; /project/pedramh/shared/S2S/acc_plots/de7c53db-9ac6-4a7c-98b3-30eff14a2452
+2026-05-31 09:33:12,764 - root - INFO - Self.epoch: 0 in Trainer
+2026-05-31 09:33:12,764 - root - INFO - Params
+2026-05-31 09:33:12,764 - root - INFO - Self.epoch: 0 in Trainer
+2026-05-31 09:33:12,764 - root - INFO - Params
+2026-05-31 09:33:12,764 - root - INFO - Self.epoch: 0 in Trainer
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/functional.py:539: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:3637.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/functional.py:539: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:3637.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/functional.py:539: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:3637.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+2026-05-31 09:33:13,223 - root - INFO - Created directory: /project/pedramh/shared/S2S/spectra_out/b83642a4-bb8e-48d5-8380-0a164501d5b9
+2026-05-31 09:33:13,223 - root - INFO - Created directory: /project/pedramh/shared/S2S/gif_out/b83642a4-bb8e-48d5-8380-0a164501d5b9
+2026-05-31 09:33:13,223 - root - INFO - Created directory: /project/pedramh/shared/S2S/acc_plots/b83642a4-bb8e-48d5-8380-0a164501d5b9
+wandb: WARNING `resume` will be ignored since W&B syncing is set to `offline`. Starting a new run with run id 7l4f9pux.
+wandb: Tracking run with wandb version 0.21.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+2026-05-31 09:33:17,527 - root - INFO - torch.compile enabled (mode=reduce-overhead)
+2026-05-31 09:33:17,528 - root - INFO - torch.compile enabled (mode=reduce-overhead)
+2026-05-31 09:33:17,528 - root - INFO - torch.compile enabled (mode=reduce-overhead)
+2026-05-31 09:33:18,037 - root - INFO - WandB initialized with config: <utils.YParams.YParams object at 0x7fdc24e4ae90>
+2026-05-31 09:33:18,070 - root - INFO - Params
+2026-05-31 09:33:18,071 - root - INFO - Self.epoch: 0 in Trainer
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/functional.py:539: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:3637.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+2026-05-31 09:33:19,922 - root - INFO - torch.compile enabled (mode=reduce-overhead)
+2026-05-31 09:33:24,641 - root - INFO - Starting fresh training run
+2026-05-31 09:33:24,642 - root - INFO - Self.epoch: 0 in after restore checkpoint
+2026-05-31 09:33:24,642 - root - INFO - Scheduler is setup
+2026-05-31 09:33:24,642 - root - INFO - Starting fresh training run
+2026-05-31 09:33:24,642 - root - INFO - VAE loss is setup
+2026-05-31 09:33:24,642 - root - INFO - Self.epoch: 0 in after restore checkpoint
+2026-05-31 09:33:24,642 - root - INFO - Scheduler is setup
+2026-05-31 09:33:24,642 - root - INFO - Losses is setup
+2026-05-31 09:33:24,642 - root - INFO - VAE loss is setup
+2026-05-31 09:33:24,642 - root - INFO - Starting fresh training run
+2026-05-31 09:33:24,643 - root - INFO - Expected total batches: 160
+2026-05-31 09:33:24,643 - root - INFO - Self.epoch: 0 in after restore checkpoint
+2026-05-31 09:33:24,643 - root - INFO - Scheduler is setup
+2026-05-31 09:33:24,643 - root - INFO - Losses is setup
+2026-05-31 09:33:24,643 - root - INFO - Expected total batches: 160
+2026-05-31 09:33:24,643 - root - INFO - VAE loss is setup
+2026-05-31 09:33:24,643 - root - INFO - Losses is setup
+2026-05-31 09:33:24,643 - root - INFO - Expected total batches: 160
+2026-05-31 09:33:24,648 - root - INFO - Number of trainable model parameters: 79352656
+2026-05-31 09:33:24,650 - root - INFO - Starting fresh training run
+2026-05-31 09:33:24,650 - root - INFO - Self.epoch: 0 in after restore checkpoint
+2026-05-31 09:33:24,650 - root - INFO - Scheduler is setup
+2026-05-31 09:33:24,650 - root - INFO - VAE loss is setup
+2026-05-31 09:33:24,651 - root - INFO - Losses is setup
+2026-05-31 09:33:24,651 - root - INFO - Starting Training Loop...
+2026-05-31 09:33:24,651 - root - INFO - Starting epoch 1/2
+2026-05-31 09:33:24,651 - root - INFO - Expected total batches: 160
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/_dynamo/variables/functions.py:679: UserWarning: Graph break due to unsupported builtin None.Tensor.view. This function is either a Python builtin (e.g. _warnings.warn) or a third-party C/C++ Python extension (perhaps created with pybind). If it is a Python builtin, please file an issue on GitHub so the PyTorch team can add support for it and see the next case for a workaround. If it is a third-party C/C++ Python extension, please either wrap it into a PyTorch-understood custom operator (see https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html for more details) or, if it is traceable, use torch.compiler.allow_in_graph.
+  torch._dynamo.utils.warn_once(msg)
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/_dynamo/variables/functions.py:679: UserWarning: Graph break due to unsupported builtin None.Tensor.view. This function is either a Python builtin (e.g. _warnings.warn) or a third-party C/C++ Python extension (perhaps created with pybind). If it is a Python builtin, please file an issue on GitHub so the PyTorch team can add support for it and see the next case for a workaround. If it is a third-party C/C++ Python extension, please either wrap it into a PyTorch-understood custom operator (see https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html for more details) or, if it is traceable, use torch.compiler.allow_in_graph.
+  torch._dynamo.utils.warn_once(msg)
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/_dynamo/variables/functions.py:679: UserWarning: Graph break due to unsupported builtin None.Tensor.view. This function is either a Python builtin (e.g. _warnings.warn) or a third-party C/C++ Python extension (perhaps created with pybind). If it is a Python builtin, please file an issue on GitHub so the PyTorch team can add support for it and see the next case for a workaround. If it is a third-party C/C++ Python extension, please either wrap it into a PyTorch-understood custom operator (see https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html for more details) or, if it is traceable, use torch.compiler.allow_in_graph.
+  torch._dynamo.utils.warn_once(msg)
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/_dynamo/variables/functions.py:679: UserWarning: Graph break due to unsupported builtin None.Tensor.view. This function is either a Python builtin (e.g. _warnings.warn) or a third-party C/C++ Python extension (perhaps created with pybind). If it is a Python builtin, please file an issue on GitHub so the PyTorch team can add support for it and see the next case for a workaround. If it is a third-party C/C++ Python extension, please either wrap it into a PyTorch-understood custom operator (see https://pytorch.org/tutorials/advanced/custom_ops_landing_page.html for more details) or, if it is traceable, use torch.compiler.allow_in_graph.
+  torch._dynamo.utils.warn_once(msg)
+[rank3]:W0531 09:35:09.197000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] torch._dynamo hit config.cache_size_limit (8)
+[rank3]:W0531 09:35:09.197000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    function: 'torch_dynamo_resume_in_forward_at_1048' (/project/pedramh/shared/S2S/v2.0/networks/pangu.py:1048)
+[rank3]:W0531 09:35:09.197000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    last reason: 11/7: Cache line invalidated because L['___stack0'] got deallocated
+[rank3]:W0531 09:35:09.197000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank3]:W0531 09:35:09.197000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank1]:W0531 09:35:09.715000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] torch._dynamo hit config.cache_size_limit (8)
+[rank1]:W0531 09:35:09.715000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    function: 'torch_dynamo_resume_in_forward_at_1048' (/project/pedramh/shared/S2S/v2.0/networks/pangu.py:1048)
+[rank1]:W0531 09:35:09.715000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    last reason: 11/7: Cache line invalidated because L['___stack0'] got deallocated
+[rank1]:W0531 09:35:09.715000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank1]:W0531 09:35:09.715000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank2]:W0531 09:35:09.715000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] torch._dynamo hit config.cache_size_limit (8)
+[rank2]:W0531 09:35:09.715000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    function: 'torch_dynamo_resume_in_forward_at_1048' (/project/pedramh/shared/S2S/v2.0/networks/pangu.py:1048)
+[rank2]:W0531 09:35:09.715000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    last reason: 11/7: Cache line invalidated because L['___stack0'] got deallocated
+[rank2]:W0531 09:35:09.715000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank2]:W0531 09:35:09.715000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank0]:W0531 09:35:10.379000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] torch._dynamo hit config.cache_size_limit (8)
+[rank0]:W0531 09:35:10.379000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    function: 'torch_dynamo_resume_in_forward_at_1048' (/project/pedramh/shared/S2S/v2.0/networks/pangu.py:1048)
+[rank0]:W0531 09:35:10.379000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8]    last reason: 11/7: Cache line invalidated because L['___stack0'] got deallocated
+[rank0]:W0531 09:35:10.379000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank0]:W0531 09:35:10.379000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [11/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank3]:W0531 09:35:12.978000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] torch._dynamo hit config.cache_size_limit (8)
+[rank3]:W0531 09:35:12.978000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    function: 'forward' (/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/layers/drop.py:178)
+[rank3]:W0531 09:35:12.978000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    last reason: 22/0: tensor 'L['x']' size mismatch at index 1. expected 40500, actual 10350
+[rank3]:W0531 09:35:12.978000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank3]:W0531 09:35:12.978000 2305958 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank2]:W0531 09:35:13.459000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] torch._dynamo hit config.cache_size_limit (8)
+[rank2]:W0531 09:35:13.459000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    function: 'forward' (/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/layers/drop.py:178)
+[rank2]:W0531 09:35:13.459000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    last reason: 22/0: tensor 'L['x']' size mismatch at index 1. expected 40500, actual 10350
+[rank2]:W0531 09:35:13.459000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank2]:W0531 09:35:13.459000 2305957 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank1]:W0531 09:35:13.519000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] torch._dynamo hit config.cache_size_limit (8)
+[rank1]:W0531 09:35:13.519000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    function: 'forward' (/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/layers/drop.py:178)
+[rank1]:W0531 09:35:13.519000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    last reason: 22/0: tensor 'L['x']' size mismatch at index 1. expected 40500, actual 10350
+[rank1]:W0531 09:35:13.519000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank1]:W0531 09:35:13.519000 2305956 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[rank0]:W0531 09:35:14.034000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] torch._dynamo hit config.cache_size_limit (8)
+[rank0]:W0531 09:35:14.034000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    function: 'forward' (/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/timm/layers/drop.py:178)
+[rank0]:W0531 09:35:14.034000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8]    last reason: 22/0: tensor 'L['x']' size mismatch at index 1. expected 40500, actual 10350
+[rank0]:W0531 09:35:14.034000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+[rank0]:W0531 09:35:14.034000 2305955 venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py:906] [22/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+skipping cudagraphs due to skipping cudagraphs due to cpu device (primals_2). Found from : 
+   File "/project/pedramh/shared/S2S/v2.0/networks/pangu.py", line 567, in torch_dynamo_resume_in_forward_at_564
+    output_surface = output_2D[:, self.surface_prognostic_idxs]
+
+skipping cudagraphs due to skipping cudagraphs due to cpu device (primals_2). Found from : 
+   File "/project/pedramh/shared/S2S/v2.0/networks/pangu.py", line 567, in torch_dynamo_resume_in_forward_at_564
+    output_surface = output_2D[:, self.surface_prognostic_idxs]
+
+skipping cudagraphs due to skipping cudagraphs due to cpu device (primals_2). Found from : 
+   File "/project/pedramh/shared/S2S/v2.0/networks/pangu.py", line 567, in torch_dynamo_resume_in_forward_at_564
+    output_surface = output_2D[:, self.surface_prognostic_idxs]
+
+skipping cudagraphs due to skipping cudagraphs due to cpu device (primals_2). Found from : 
+   File "/project/pedramh/shared/S2S/v2.0/networks/pangu.py", line 567, in torch_dynamo_resume_in_forward_at_564
+    output_surface = output_2D[:, self.surface_prognostic_idxs]
+
+[rank1]:[W531 09:36:36.261043681 reducer.cpp:327] Warning: Grad strides do not match bucket view strides. This may indicate grad was not created according to the gradient layout contract, or that the param's strides changed since DDP was constructed.  This is not an error, but may impair performance.
+grad.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 384, 384, 384]
+bucket_view.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 1, 1, 1] (function operator())
+[rank2]:[W531 09:36:36.321391312 reducer.cpp:327] Warning: Grad strides do not match bucket view strides. This may indicate grad was not created according to the gradient layout contract, or that the param's strides changed since DDP was constructed.  This is not an error, but may impair performance.
+grad.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 384, 384, 384]
+bucket_view.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 1, 1, 1] (function operator())
+[rank0]:[W531 09:36:37.956954864 reducer.cpp:327] Warning: Grad strides do not match bucket view strides. This may indicate grad was not created according to the gradient layout contract, or that the param's strides changed since DDP was constructed.  This is not an error, but may impair performance.
+grad.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 384, 384, 384]
+bucket_view.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 1, 1, 1] (function operator())
+[rank3]:[W531 09:36:37.038749595 reducer.cpp:327] Warning: Grad strides do not match bucket view strides. This may indicate grad was not created according to the gradient layout contract, or that the param's strides changed since DDP was constructed.  This is not an error, but may impair performance.
+grad.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 384, 384, 384]
+bucket_view.sizes() = [192, 384, 1, 1, 1], strides() = [384, 1, 1, 1, 1] (function operator())
+2026-05-31 09:36:37,596 - root - INFO - DDP unused-param check: 4 params have grad=None (find_unused_parameters=True must stay): first few: ['module._orig_mod.layer_perturbation2.weight', 'module._orig_mod.layer_perturbation2.bias', 'module._orig_mod.layer_purturbation_e2.weight']
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/cuda/graphs.py:84: UserWarning: The CUDA Graph is empty. This usually means that the graph was attempted to be captured on wrong device or stream. (Triggered internally at /pytorch/aten/src/ATen/cuda/CUDAGraph.cpp:206.)
+  super().capture_end()
+W0531 09:38:52.114000 2305929 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 2305955 closing signal SIGTERM
+E0531 09:38:52.247000 2305929 site-packages/torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: -11) local_rank: 2 (pid: 2305957) of binary: /project/pedramh/shared/S2S/v2.0/venv/bin/python
+Traceback (most recent call last):
+  File "/project/pedramh/shared/S2S/v2.0/venv/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/distributed/run.py", line 918, in main
+    run(args)
+  File "/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/distributed/run.py", line 909, in run
+    elastic_launch(
+  File "/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/project/pedramh/shared/S2S/v2.0/venv/lib/python3.11/site-packages/torch/distributed/launcher/api.py", line 269, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+=========================================================
+/project/pedramh/shared/S2S/v2.0/train.py FAILED
+---------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+---------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-05-31_09:38:52
+  host      : midway3-0423.rcc.local
+  rank      : 2 (local_rank: 2)
+  exitcode  : -11 (pid: 2305957)
+  error_file: <N/A>
+  traceback : Signal 11 (SIGSEGV) received by PID 2305957
+=========================================================
+The target application terminated. One or more process it created re-parented.
+Waiting for termination of re-parented processes.
+Use the `--wait` option to modify this behavior.
