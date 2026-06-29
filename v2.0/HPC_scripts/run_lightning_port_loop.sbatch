@@ -90,8 +90,35 @@ heartbeat & HEARTBEAT_PID=$!
 echo "[heartbeat] $(date) — started (pid $HEARTBEAT_PID), tailing latest logs/lport-iter-*.log every ~30 min"
 
 PROMPT="prompts/_cluster_autonomous_lightning_port_loop.md"
-[[ -r "$PROMPT" ]] || { echo "[FATAL] $(date) prompt not readable: $PROMPT" >&2; stop_heartbeat; exit 1; }
-[[ -r ".claude/agents/lightning-porter.md" ]] || { echo "[FATAL] $(date) porter agent missing: .claude/agents/lightning-porter.md" >&2; stop_heartbeat; exit 1; }
+
+# --- preflight: every prompt/agent/hook/settings asset the loop spawns must be present on THIS node before the
+#     first claude call. The .claude/ agents + hooks are gitignored (shipped via scp); a missing one silently
+#     breaks the run — a gauntlet subagent that does not exist, or an unenforced guardrail hook. FATAL with the
+#     FULL missing list so one scp round fixes it, rather than failing mid-loop. ---
+REQUIRED=(
+  "$PROMPT"
+  ".claude/agents/lightning-porter.md"
+  ".claude/agents/drift-auditor.md"
+  ".claude/agents/s2s-code-reviewer.md"
+  ".claude/agents/s2s-code-reviewer-critic.md"
+  ".claude/tools/_hook_block_dangerous_cmds.sh"
+  ".claude/tools/_hook_check_s2s_invariants.sh"
+  ".claude/tools/check_s2s_invariants.sh"
+  ".claude/settings.local.json"
+)
+missing=()
+for f in "${REQUIRED[@]}"; do [[ -r "$REPO/$f" ]] || missing+=("$f"); done
+if (( ${#missing[@]} )); then
+  echo "[FATAL] $(date) preflight: ${#missing[@]} required file(s) missing on $(hostname) — scp them (see manifest) before running:" >&2
+  printf '  MISSING: %s\n' "${missing[@]}" >&2
+  stop_heartbeat; exit 1
+fi
+# The block-dangerous PreToolUse hook must be REGISTERED in settings, not merely present — it is the enforcement
+# backstop under --dangerously-skip-permissions (which ignores settings deny rules but NOT hooks). Warn loudly.
+if ! grep -q "_hook_block_dangerous_cmds.sh" "$REPO/.claude/settings.local.json" 2>/dev/null; then
+  echo "[WARN] $(date) .claude/settings.local.json does not register _hook_block_dangerous_cmds.sh as a PreToolUse hook — the guardrail backstop is INACTIVE; register it (see scp manifest) before trusting the run." >&2
+fi
+echo "[preflight] $(date) OK — all ${#REQUIRED[@]} required prompt/agent/hook/settings files present on $(hostname)"
 
 # Loop control. Health is judged by PROGRESS (a new git commit), not by exit code or wall-clock. Counters persist
 # across chained jobs, reset on any progress/success:

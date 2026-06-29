@@ -49,7 +49,9 @@ one-line blocker, fire a `PushNotification` naming the file, do **not** proceed 
   common/bench_callback.py, environment.yml}`.
 - S2S source: `v2.0/{train.py, inference.py, networks/pangu.py, utils/data_loader_multifiles.py, utils/losses.py,
   utils/YParams.py, config/exp2.yaml, config/test.yaml}`.
-- The porter agent: `.claude/agents/lightning-porter.md` (its frontmatter + the S2S→Lightning mapping table).
+- The agents: `.claude/agents/lightning-porter.md` (the worker; its frontmatter + the S2S→Lightning mapping
+  table) **plus the gauntlet agents** `s2s-code-reviewer.md`, `s2s-code-reviewer-critic.md`, `drift-auditor.md`
+  (all must be present — the sbatch preflight hard-checks them).
 - The Lightning env (§4): `$LPORT_ENV` resolves and `import lightning, torch` succeeds.
 
 ---
@@ -115,17 +117,28 @@ Delegate each phase to the `lightning-porter` agent; dependency order (reuse, do
 
 ---
 
-## 5. Light gauntlet (after each green commit)
+## 5. Gauntlet (after each green commit) — Wave A review, then Wave B critic
 
-Spawn via the `Agent` tool, in parallel (use ONLY agents that exist on the cluster checkout — see manifest):
+**Wave A — review (parallel, via the `Agent` tool; capture each agent's full output):**
 - **`s2s-code-reviewer`** (custom agent — `.claude/agents/s2s-code-reviewer.md` must be present) on the phase
   diff: climate-model + optimization + Lightning correctness, **reuse-not-rewrite**, preserved DDP/AMP/bench
   instrumentation, Google-style docstrings with **no dangling references**, and the **numerical-equivalence gate**
-  for any perf change. (Falls back to the built-in `general-purpose` agent if the file is absent.)
+  for any perf change. **Keep its full review text — you pass it to the critic.**
 - **`drift-auditor`** (custom agent — `.claude/agents/drift-auditor.md` must be present) on docs/CLAUDE.md vs the
   landed change: attribution not inverted, "handoff" terminology, no NGC key, no non-Midway data path.
-Any P0/Critical, or a `drift-auditor` fix you have not applied → **re-enter §3** before advancing the green
-floor. The green floor never advances with a live P0 or a stale doc.
+
+**Wave B — critic (after Wave A, via the `Agent` tool):**
+- **`s2s-code-reviewer-critic`** (custom agent — `.claude/agents/s2s-code-reviewer-critic.md` must be present):
+  pass it the phase **diff AND the `s2s-code-reviewer`'s full review**. It scores the *review* for missed
+  load-bearing issues, **severity mis-calibration** (esp. under-graded inference-path climate P0s), trap
+  false-positives, and anchor fidelity — it does NOT re-review from scratch. It returns **REVIEW STANDS** or
+  **REVIEW NEEDS REVISION**.
+
+**Resolving the gauntlet.** Any of — a Wave-A P0/Critical · an un-applied `drift-auditor` fix · a critic verdict
+of **REVIEW NEEDS REVISION** (a missed load-bearing issue, a P0 the reviewer under-graded, or a trap it falsely
+flagged) — means **re-enter §3**: fix the code (or re-grade and re-run `s2s-code-reviewer`), then re-run the
+gauntlet. The green floor never advances with a live P0, a stale doc, or an un-addressed critic finding. Emit
+`=== LOOP: STAGE_LANDED ===` only when Wave A is clean **and** the critic returns **REVIEW STANDS**.
 
 ---
 
