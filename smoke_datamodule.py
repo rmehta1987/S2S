@@ -39,6 +39,20 @@ def _describe(name, obj):
 
 
 def main():
+    """Run the Phase-1 DataModule smoke and print ``SMOKE_OK`` on success.
+
+    Loads ``v2.0/config/test.yaml`` via :class:`utils.YParams.YParams`, forces a
+    single-process loader (``num_data_workers=0``), instantiates
+    :class:`data.datamodule.ClimateDataModule`, runs ``setup("fit")``, asserts the
+    train/val datasets and their normalizer buffers
+    (``constant_boundary_data`` / ``land_mask``) are present, and pulls one
+    training batch -- proving the DataModule wiring works end-to-end against the
+    real HDF5 dataset at ``/project/pedramh/h5data/h5data``.
+
+    Returns:
+        None: The commit gate keys on the printed ``SMOKE_OK`` token, not a
+        return value (``sys.exit(main())`` therefore exits 0).
+    """
     config_path = os.path.abspath("v2.0/config/test.yaml")
     print(f"Loading config: {config_path} (section S2S)")
     params = YParams(config_path, "S2S")

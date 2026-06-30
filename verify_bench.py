@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Verify benchmark report numbers against raw nsys SQLite files."""
+"""Verify benchmark report numbers against raw nsys SQLite files.
+
+Standalone analysis utility (predates the Lightning port; see the
+``bench-instrumentation`` history). For each exported nsys ``.sqlite`` profile in
+:data:`FILES` it prints GPU utilisation, H2D/D2H bandwidth, NCCL kernel counts,
+transfer-size distributions and inter-kernel gap histograms, so the numbers in
+the benchmark report can be re-derived from the raw CUPTI activity tables.
+
+Note:
+    The paths in :data:`FILES` are frozen pointers to nsys exports from an
+    earlier capture campaign and are **not** the HDF5 dataset path. Several no
+    longer resolve on this cluster; :func:`main` skips any that are missing
+    (printing ``MISSING``) rather than failing. Repoint :data:`FILES` at a local
+    ``.sqlite`` export before running.
+"""
 import sqlite3
 import statistics
 from pathlib import Path
@@ -21,6 +35,15 @@ FILES = {
 
 
 def gpu_util(con, label):
+    """Print per-device GPU utilisation from the kernel activity table.
+
+    Sums kernel active time over the captured window per ``deviceId`` and reports
+    launches, active ms, window ms and the active/window utilisation percentage.
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT deviceId, COUNT(*) AS launches,
@@ -38,6 +61,15 @@ def gpu_util(con, label):
 
 
 def h2d_bandwidth(con, label):
+    """Print per-device host-to-device (H2D) copy bandwidth.
+
+    Aggregates ``copyKind=1`` (host-to-device) memcpy activity per ``deviceId``
+    and reports transfer count, total time, total GB and effective GB/s.
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT deviceId, COUNT(*), SUM(end-start)/1e6, SUM(bytes)/1e9
@@ -54,6 +86,16 @@ def h2d_bandwidth(con, label):
 
 
 def d2h_bandwidth(con, label):
+    """Print per-device device-to-host (D2H) copy bandwidth.
+
+    Aggregates ``copyKind=2`` (device-to-host) memcpy activity per ``deviceId``
+    and reports transfer count, total time, total GB and effective GB/s -- the
+    D2H counterpart of :func:`h2d_bandwidth`.
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT deviceId, COUNT(*), SUM(end-start)/1e6, SUM(bytes)/1e9
@@ -69,6 +111,17 @@ def d2h_bandwidth(con, label):
 
 
 def gap_distribution(con, label, device_id=0):
+    """Print the inter-kernel idle-gap histogram for one device.
+
+    Orders kernels by start time, computes the positive gaps between consecutive
+    kernels, and buckets them (``<=10ms`` .. ``>1s``) -- surfacing the long
+    (> 500 ms) stalls the report attributes to I/O or barrier waits.
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+        device_id: The ``deviceId`` to analyse (default ``0``).
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT start, end FROM CUPTI_ACTIVITY_KIND_KERNEL
@@ -108,6 +161,16 @@ def gap_distribution(con, label, device_id=0):
 
 
 def h2d_srckind(con, label):
+    """Print H2D transfer volume grouped by source memory kind.
+
+    Joins ``copyKind=1`` memcpys to ``ENUM_CUDA_MEM_KIND`` on ``srcKind`` to show
+    whether H2D copies originate from pageable or pinned host memory (the pinned
+    fraction is what ``pin_memory=True`` buys).
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT e.label, COUNT(*), SUM(m.bytes)/1e9
@@ -124,6 +187,15 @@ def h2d_srckind(con, label):
 
 
 def per_gpu_h2d_srckind(con, label):
+    """Print H2D transfer volume by source memory kind, split per device.
+
+    The per-``deviceId`` breakdown of :func:`h2d_srckind`, exposing whether a
+    single GPU dominates the pageable-source H2D traffic.
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT m.deviceId, e.label, COUNT(*), SUM(m.bytes)/1e9
@@ -140,6 +212,16 @@ def per_gpu_h2d_srckind(con, label):
 
 
 def nccl_kernels(con, label):
+    """Print the count of NCCL collective kernels in the capture.
+
+    Joins the kernel table to ``StringIds`` and counts demangled names matching
+    ``nccl`` (any case) -- a quick check for whether DDP gradient all-reduce
+    kernels are present in the profile.
+
+    Args:
+        con: An open :class:`sqlite3.Connection` to the nsys export.
+        label: Run label used in the printed header.
+    """
     cur = con.cursor()
     cur.execute("""
         SELECT COUNT(*) FROM CUPTI_ACTIVITY_KIND_KERNEL k
@@ -184,6 +266,14 @@ def transfer_size_buckets(con, label):
 
 
 def main():
+    """Run every analysis section over each existing profile in :data:`FILES`.
+
+    Iterates :data:`FILES`, skipping (and printing ``MISSING`` for) any path that
+    does not resolve on this filesystem -- see the module docstring's note on the
+    frozen paths -- and runs the full suite (utilisation, H2D/D2H bandwidth,
+    source-kind breakdowns, NCCL count, transfer-size and per-device gap
+    distributions) on each that does.
+    """
     for label, path in FILES.items():
         if not Path(path).exists():
             print(f"MISSING: {path}")
