@@ -2,7 +2,7 @@
 
 You are running **autonomously on Midway3 (RCC), no operator in the loop.** Your job: incrementally port the
 S2S model codebase (`v2.0/`, the canonical bench-instrumented `train.py`/`inference.py`) onto **PyTorch
-Lightning**, restructured to mirror the sibling project at `/home/rmeht/Projects/SNFO`, so that S2S and SNFO
+Lightning**, restructured to mirror the sibling project **SNFO** (harness-exported as `$SNFO_DIR`, cluster default `/project/pedramh/shared/anthonyz`), so that S2S and SNFO
 ultimately share **one** codebase whose **only material difference is the model definition**
 (`PanguModel_Plasim` vs SNFO's models).
 
@@ -45,8 +45,9 @@ floor — never past a green commit.
 
 At orient, confirm each is present and readable; if a **load-bearing reference is ABSENT, STOP**: write a
 one-line blocker, fire a `PushNotification` naming the file, do **not** proceed from memory.
-- SNFO template: `/home/rmeht/Projects/SNFO/{train.py, modules/train_module.py, data/datamodule.py,
-  common/bench_callback.py, environment.yml}`.
+- SNFO template at **`$SNFO_DIR`** (harness-exported; cluster default `/project/pedramh/shared/anthonyz` —
+  resolve it with `echo $SNFO_DIR` before reading): `$SNFO_DIR/{train.py, modules/train_module.py,
+  data/datamodule.py, common/bench_callback.py, environment.yml}`.
 - S2S source: `v2.0/{train.py, inference.py, networks/pangu.py, utils/data_loader_multifiles.py, utils/losses.py,
   utils/YParams.py, config/exp2.yaml, config/test.yaml}`.
 - The agents: `.claude/agents/lightning-porter.md` (the worker; its frontmatter + the S2S→Lightning mapping

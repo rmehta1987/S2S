@@ -83,6 +83,9 @@ trap chain_on_signal USR1
 # TODO(operator): add any site module loads your build node needs for git/python here.
 module load python/miniforge-25.3.0 2>/dev/null || true
 export PATH="$HOME/.local/bin:$PATH"          # keep the node-based `claude` CLI on PATH
+# SNFO template checkout the porter mirrors — exported so the porter (and the preflight) resolve it. Cluster
+# default is the shared copy; if SNFO ever moves, change ONLY this line (or set SNFO_DIR in the environment).
+export SNFO_DIR="${SNFO_DIR:-/project/pedramh/shared/anthonyz}"
 command -v claude >/dev/null 2>&1 || { echo "[FATAL] $(date) 'claude' not on PATH (expected ~/.local/bin) — cannot run headless loop." >&2; exit 1; }
 command -v git    >/dev/null 2>&1 || { echo "[FATAL] $(date) 'git' not on PATH." >&2; exit 1; }
 

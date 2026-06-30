@@ -41,6 +41,20 @@ echo "[OK]   (A) all ${#REQUIRED[@]} required prompt/agent/hook/settings files p
 grep -q "_hook_block_dangerous_cmds.sh" "$REPO/.claude/settings.local.json" 2>/dev/null \
   || echo "[WARN] (A) settings.local.json does not register the block-dangerous PreToolUse hook — guardrail backstop INACTIVE (expected on a dev box; required on the cluster)" >&2
 
+# ---------- (C) SNFO template checkout present (the porter mirrors it) ----------
+SNFO_DIR="${SNFO_DIR:-/project/pedramh/shared/anthonyz}"
+[[ -d "$SNFO_DIR" ]] || fail "(C) SNFO template dir not found: SNFO_DIR=$SNFO_DIR — set SNFO_DIR or fix the path (the porter mirrors this checkout)"
+snfo_miss=()
+for f in train.py modules/train_module.py data/datamodule.py common/bench_callback.py environment.yml; do
+  [[ -r "$SNFO_DIR/$f" ]] || snfo_miss+=("$f")
+done
+if (( ${#snfo_miss[@]} )); then
+  printf '[FAIL] (C) SNFO_DIR=%s is missing template file(s):\n' "$SNFO_DIR" >&2
+  printf '   MISSING: %s\n' "${snfo_miss[@]}" >&2
+  exit 1
+fi
+echo "[OK]   (C) SNFO template present at $SNFO_DIR"
+
 # ---------- (B) commit-on-pass / revert-on-fail guardrail, in an ISOLATED temp repo ----------
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 git -C "$tmp" init -q
