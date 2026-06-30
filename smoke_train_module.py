@@ -2,8 +2,10 @@
 
 Builds ``ClimateDataModule`` + ``TrainModule`` from ``v2.0/config/test.yaml``
 and runs a 2-step ``L.Trainer.fit`` on one GPU, asserting the training loss is
-finite. Prints ``SMOKE_OK`` on success. Run under ``PYTHONPATH=v2.0/`` via the
-nested sbatch wrapper ``midway_smoke_train_module.sh``.
+finite. Prints ``SMOKE_OK`` on success. Run under
+``PYTHONPATH=v2.0/:<repo-root>`` -- ``v2.0/`` resolves ``utils``/``networks`` and
+the repo root resolves ``data``/``modules`` -- via the nested sbatch wrapper
+``midway_smoke_train_module.sh``.
 """
 
 import math

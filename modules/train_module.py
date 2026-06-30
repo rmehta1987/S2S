@@ -108,8 +108,10 @@ class TrainModule(L.LightningModule):
     instantiated in :meth:`_setup_loss_fun`. :meth:`training_step` ports
     ``v2.0/train.py::Trainer.cal_loss``: it runs the model (returning the
     7-tuple ``(output_surface, output_upper_air, output_diagnostic, mu, sigma,
-    mu2, sigma2)``), combines the surface / upper-air / diagnostic losses with
-    the original weights, and adds the VAE term when enabled.
+    mu2, sigma2)`` -- where ``mu2``/``sigma2`` are the second-encoder
+    ``mu_e2``/``sigma_e2`` of :class:`networks.pangu.PanguModel_Plasim`, consumed
+    positionally), combines the surface / upper-air / diagnostic losses with the
+    original weights, and adds the VAE term when enabled.
 
     The constant-boundary tensor and the CRPS latitudes are registered as
     buffers so Lightning places them on the right device — no manual
@@ -767,6 +769,12 @@ class TrainModule(L.LightningModule):
         for step in range(max_lead_time):
             if _NVTX:
                 nvtx.range_push(f"val_model_forward_step{step}")
+            # TODO(phase-4): this 5-tuple unpack assumes has_diagnostic=True --
+            # the eval forward returns a 4-tuple when has_diagnostic is False
+            # (networks/pangu.py:623). It faithfully reproduces the source's
+            # has_diagnostic=True-only validate_one_epoch (v2.0/train.py:1314);
+            # branch on self.has_diagnostic when a non-diagnostic (or
+            # predict_delta=True) config first reaches validation in Phase 4.
             val_output_surface, val_output_upper_air, val_output_diagnostic, _, _ = self.model(
                 val_input_surface,
                 constant_boundary_data,
@@ -826,8 +834,12 @@ class TrainModule(L.LightningModule):
         For ``OneCycleLR`` the total step count needs ``steps_per_epoch``; under
         Lightning that is taken from the trainer's
         ``estimated_stepping_batches`` (``max_epochs * steps_per_epoch``) so the
-        schedule spans the configured run. ``ReduceLROnPlateau`` is returned with
-        the ``valid_loss`` monitor it was stepped on in the source.
+        schedule spans the configured run. ``ReduceLROnPlateau`` here monitors
+        ``val/valid_loss_1step`` (the 1-step lead-time validation loss). The
+        source (``v2.0/train.py``) stepped the plateau scheduler on an
+        *aggregate* ``valid_loss`` summed over all lead times; the port logs only
+        per-lead-time keys (``val/valid_loss_{n}step``), so the 1-step loss is
+        used as the monitored proxy -- a deliberate change, not a fidelity claim.
 
         Returns:
             tuple | torch.optim.Optimizer: ``([optimizer], [scheduler])`` when a
