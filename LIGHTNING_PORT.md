@@ -1,4 +1,10 @@
-# S2S to PyTorch Lightning Port -- Reconciliation Audit (Phase 5)
+# S2S to PyTorch Lightning Port -- Port Record (Phases 0--6, PORT_COMPLETE)
+
+> Status: PORT_COMPLETE on branch ``lightning-port`` (green floor ``9261fc5``).
+> Sections 1--6 are the Phase-5 reconciliation audit; Sections 7--10 (appended at
+> PORT_COMPLETE) add the Phase-6 docstring/reference-integrity pass, the
+> consolidated per-phase smoke-id table, launch instructions, and the final
+> certification.
 
 This document is the Phase-5 reconciliation of the S2S to PyTorch Lightning port
 against the sibling SNFO template. It is an **evidence-based audit**, not a
@@ -300,3 +306,91 @@ Phase-5 floor.
 
 * Certification smoke job: **51311092** (``_scratch/smoke_phase3_51311092.out``)
 * Result: ``TRAIN_PATH_OK`` + ``BENCH_PATH_OK`` + ``SMOKE_OK``
+
+## 7. Phase 6 -- docstring / reference-integrity pass (as landed)
+
+Phase 6 is verification-only: it adds no executable behavior. It audited every
+ported docstring for Google-style completeness and verified every cross-reference
+resolves to a real symbol, then resolved the documentation findings the gauntlet
+surfaced. Three commits, each gated on a real GPU smoke:
+
+* ``cb77e3c`` -- docstring + reference-integrity audit. The core ported tree
+  (``train.py`` / ``val.py`` / ``bench.py`` / ``common/`` / ``data/datamodule.py`` /
+  ``modules/train_module.py``) was already clean -- every ``v2.0`` cross-reference
+  verified exact (``PanguModel_Plasim`` 7/5/4-tuple forward arity; dead modules
+  ``layer_perturbation2`` @ ``pangu.py:363`` / ``layer_purturbation_e2`` @ ``:408``;
+  ``Stepper.save_prediction`` @ ``inference.py:231``). The only Check-1 gaps filled
+  were the smoke harnesses + the ``verify_bench.py`` analysis utility.
+  Behavior-neutral (executable AST byte-identical, docstring-only). Gate smoke
+  **51311252** (2-step ``fit``, ``SMOKE_OK``).
+* ``15c2812`` -- resolved the drift-auditor's documentation findings: 3 of the 5
+  Phase-0 scaffold READMEs (``modules/`` / ``modules/models/`` / ``common/``)
+  rewritten from forward-tense scaffold to as-landed state (the model is
+  **reused in place**, not copied into ``modules/models/``; the config system is
+  settled-YParams), plus an AST-neutral ``smoke_datamodule.py`` docstring fix.
+  Gate smoke **51312978** (datamodule, ``SMOKE_OK``).
+* ``9261fc5`` -- finished the doc pass: the remaining 2 scaffold READMEs
+  (``modules/layers/`` / ``configs/``) brought into the same as-landed form,
+  resolving a same-tree contradiction the prior partial pass had left. Pure
+  Markdown; executable tree byte-identical to ``15c2812``
+  (``git diff 15c2812 -- ':!*.md'`` empty). Gate smoke **51313651** (datamodule
+  tree-health, ``SMOKE_OK``).
+
+All 5 scaffold READMEs are now mutually consistent; no forward-tense /
+open-decision drift remains anywhere in the ported subtree.
+
+## 8. Consolidated per-phase smoke-id table (deferred from Section 1)
+
+| Phase | Landing commit(s) | Gate smoke job id(s) | Result |
+|---|---|---|---|
+| 0 scaffold | ``a4388b5`` (+ ``8b4bb19`` / ``2a7ad1c``) | CPU import (build node; no Slurm job) | ``import lightning, torch`` OK (2.5.0.post0 / 2.6.0+cu124) |
+| 1 DataModule | ``ab021a1`` (+ ``f43e8c7`` gauntlet) | 51309741, **51309754** | DataModule instantiate + one batch, pedramh-gpu |
+| 2 TrainModule | ``28ee6bc`` (+ ``e4a7930`` / ``4354351`` gauntlet) | **51310303** | 2-step ``fit``, gpu:1, finite CRPS+KL losses |
+| 3 entry points | ``1ce0c35`` (+ ``a2b98c4`` P0 / ``c812adc`` gauntlet) | 51310553 -> 51310608 / 51310609 / **51310616** | train + bench path, ``use_distributed_sampler=False`` confirmed |
+| 4 inference | ``8e97798`` (+ ``540e680`` gauntlet) | **51310825** | ``val.py`` ``trainer.validate`` + netCDF inference path, 1x H100 |
+| 5 reconcile | ``7e81363`` | **51311092** | ``TRAIN_PATH_OK`` + ``BENCH_PATH_OK`` + ``SMOKE_OK`` |
+| 6 docstring/refs | ``cb77e3c`` -> ``15c2812`` -> ``9261fc5`` | **51311252**, 51312978, 51313651 | 2-step ``fit`` / datamodule, all ``SMOKE_OK`` |
+
+Every gate smoke ran as a nested ``sbatch`` on ``--partition=pedramh-gpu
+--account=pi-pedramh`` and was read (``.out`` ``SMOKE_OK`` + ``.err`` clean +
+``sacct`` ``COMPLETED 0:0``) before its commit landed. No phase committed on an
+unverified or red smoke. Each phase diff additionally passed the review gauntlet
+(``s2s-code-reviewer`` + ``drift-auditor``, adjudicated by
+``s2s-code-reviewer-critic``) before the green floor advanced.
+
+## 9. How to launch the Lightning port
+
+All entry points require ``PYTHONPATH=v2.0:.`` and the LPORT_ENV
+(``module load python/miniforge-25.3.0; mamba activate
+/project/pedramh/shared/S2S/v2.0/venv; module load cuda/12.6``).
+
+* **Train (DDP, 4 GPU):**
+  ``PYTHONPATH=v2.0:. python train.py --yaml_config configs/test_midway.yaml
+  --config S2S --devices 0 1 2 3``
+  -> ``L.Trainer(strategy=DDPStrategy(find_unused_parameters=False,
+  static_graph=True), use_distributed_sampler=False,
+  ...).fit(TrainModule, ClimateDataModule)``.
+* **Validate / inference (single device):**
+  ``PYTHONPATH=v2.0:. python val.py --yaml_config configs/test_midway.yaml
+  --config S2S`` -> ``trainer.validate`` + the netCDF prediction path.
+* **Benchmark (throughput, S2S_BENCH):**
+  ``S2S_BENCH=1 S2S_BENCH_WARMUP=20 S2S_BENCH_STEPS=80 S2S_BENCH_CSV=bench.csv
+  PYTHONPATH=v2.0:. python bench.py --yaml_config configs/test_midway.yaml
+  --config S2S --devices 0 1 2 3`` -> ``BenchCallback`` writes a rank-0 CSV row;
+  ``S2S_NVTX=1`` adds NVTX + ``cudaProfilerStart/Stop`` around the measured window.
+
+The smoke harnesses (``smoke_datamodule.py``, ``smoke_train_module.py``) and their
+sbatch wrappers (``midway_smoke_datamodule.sh``, ``midway_smoke_train_module.sh``)
+pin ``v2.0/config/test.yaml`` for a fast 1--2-step single-GPU check.
+
+## 10. PORT_COMPLETE certification
+
+Phases 0--6 are landed on branch ``lightning-port``; the SNFO-mirrored structure
+is in place; **the only material difference from SNFO is the model definition**
+(``PanguModel_Plasim``), modulo the enumerated set (B) of necessary-S2S
+infrastructure (Sections 3--4). Every phase smoke is green (Section 8), the
+docstring/reference pass is complete (Section 7), and Phase 6's final gauntlet
+returned APPROVE + REVIEW STANDS with all 5 scaffold READMEs reconciled.
+
+Green floor at PORT_COMPLETE: ``9261fc5``. The branch is left for operator review
+-- not pushed, not merged.
