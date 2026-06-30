@@ -115,13 +115,39 @@ noprogress=$(cat "$NP_FILE" 2>/dev/null || echo 0); [[ "$noprogress" =~ ^[0-9]+$
 reset_breakers(){ fastfail=0; throttle=0; echo 0 > "$FF_FILE"; echo 0 > "$TH_FILE"; }
 is_throttle(){ grep -qiE 'temporarily limiting requests|rate.?limit(ed|ing)?|overloaded_error|"type" *: *"(overloaded|rate_limit)|too many requests|(status|http|code)[^0-9]{0,6}(429|529)\b' "$1"; }
 
+# Nested-job registry: the porter appends each smoke's id (`sbatch --parsable`) to this file (prompt §4), so the
+# orchestrator waits on EXACTLY the jobs THIS loop launched — name/folder/--chdir-agnostic — and an unrelated job
+# from your account never stalls it. nested_jobs() returns the in-flight (RUNNING/PENDING) registry ids, prunes
+# finished ones, and FALLS BACK to a folder scope (jobs whose %Z is under $REPO, minus this orchestrator) when the
+# registry is empty (e.g. the porter has not recorded an id yet).
+NESTED_FILE="$REPO/_scratch/.lport_nested_jobs"
+nested_jobs() {
+  local mine keep="" j csv
+  mine=" $(squeue --me -h -o '%i' 2>/dev/null | tr '\n' ' ') "          # my still-listed jobs (any state)
+  if [[ -s "$NESTED_FILE" ]]; then
+    while read -r j; do [[ "$j" =~ ^[0-9]+$ && "$mine" == *" $j "* ]] && keep+="$j "; done < "$NESTED_FILE"
+    if [[ -n "${keep// /}" ]]; then
+      printf '%s\n' $keep > "$NESTED_FILE"                              # prune finished ids out of the registry
+      csv=$(echo $keep | tr ' ' ',')
+      squeue -h -t RUNNING,PENDING -o '%i' -j "$csv" 2>/dev/null | tr '\n' ' '
+      return
+    fi
+    : > "$NESTED_FILE"                                                  # all recorded ids finished → clear, fall back
+  fi
+  squeue --me -h -t RUNNING,PENDING -o '%i|%j|%Z' 2>/dev/null \
+    | awk -F'|' -v self="${SLURM_JOB_NAME:-s2s-lightning-port}" -v repo="$REPO" \
+          '$2 != self && ($3 == repo || index($3, repo "/") == 1) { print $1 }' \
+    | tr '\n' ' '
+}
+
 for ((i=1; i<=MAX_ITERS; i++)); do
-  # If a NESTED GPU smoke is still in flight, WAIT before spending a claude iteration (a queued smoke makes no
-  # commits; re-invoking claude to poll would waste API calls AND trip the no-progress guard on a healthy wait).
-  # Exclude this orchestrator (and any chained sibling, same job-name) so we never deadlock; cap the wait.
+  # If a NESTED GPU smoke (a job THIS loop submitted) is still in flight, WAIT before spending a claude iteration
+  # (a queued smoke makes no commits; re-invoking claude to poll would waste API calls AND trip the no-progress
+  # guard on a healthy wait). nested_jobs() returns only jobs THIS loop launched — the porter's recorded ids, or a
+  # folder-scoped fallback — so an UNRELATED job from your account never makes the loop wait on it. Cap the wait.
   wait_start=$SECONDS
   while [[ -n "${SLURM_JOB_ID:-}" ]]; do
-    nested=$(squeue --me -h -t RUNNING,PENDING -o '%i %j' 2>/dev/null | grep -vF "${SLURM_JOB_NAME:-s2s-lightning-port}" | awk '{print $1}' | tr '\n' ' ' || true)
+    nested=$(nested_jobs)
     [[ -z "${nested// /}" ]] && break
     if (( SECONDS - wait_start > 5400 )); then
       echo "[wait] $(date) nested smoke(s) [$nested] still in flight after 1.5h — proceeding to a diagnosing iteration, NOT spinning" >&2; break

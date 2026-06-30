@@ -112,8 +112,11 @@ Delegate each phase to the `lightning-porter` agent; dependency order (reuse, do
   Default approach: clone SNFO's `environment.yml` (it already pins `lightning` 2.x on torch 2.10), or
   `mamba env update` adding `lightning` to a copy of `/project/pedramh/shared/S2S/v2.0/venv`. The env-import
   smoke runs on the build CPU (no GPU job).
-- **Persist each nested smoke job id to `_scratch/`**; the sbatch harness polls `squeue`/`sacct` and waits — do
-  **not** foreground-`sleep`. Prefer harness-tracked background jobs that re-invoke you on completion.
+- **Record every nested smoke's job id** so the orchestrator waits on exactly the jobs YOU launched (not unrelated
+  jobs from this account): submit with `jid=$(sbatch --parsable <script>)` and append it —
+  `echo "$jid" >> _scratch/.lport_nested_jobs`. The sbatch harness polls only those ids (pruning finished ones,
+  falling back to a repo-folder scope only if the file is empty). Do **not** foreground-`sleep`; prefer
+  harness-tracked background jobs that re-invoke you on completion.
 
 ---
 
