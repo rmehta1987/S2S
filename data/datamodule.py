@@ -19,8 +19,8 @@ import torch
 
 from utils.data_loader_multifiles import (
     get_data_loader,
-    get_infer_data,
-    GetDataset,
+    get_infer_data,  # noqa: F401  (Phase 4 inference path; named in docstrings)
+    GetDataset,  # noqa: F401  (dataset type for train/val_dataset; named in docstrings)
 )
 
 
@@ -39,14 +39,20 @@ class ClimateDataModule(L.LightningDataModule):
 
     (a) **Distributed sampler.** S2S's
         :func:`~utils.data_loader_multifiles.get_data_loader` builds its own
-        :class:`torch.utils.data.distributed.DistributedSampler` (and returns it
-        as the third element of the training tuple), so the prebuilt loader is
-        already DDP-correct. Lightning would otherwise inject a *second*
-        distributed sampler. The contract is therefore that the entry point
-        constructs the ``Trainer`` with ``use_distributed_sampler=False`` (wired
-        in Phase 3); this module keeps the loader as-is and retains the sampler
-        as :attr:`_train_sampler` so the training loop can call
-        ``set_epoch`` on it for correct cross-epoch shuffling.
+        sampler and returns it as the third element of the training tuple: a
+        :class:`torch.utils.data.distributed.DistributedSampler` when a process
+        group is initialized, otherwise a :class:`torch.utils.data.RandomSampler`
+        (single-process). Either way the prebuilt loader is already correctly
+        sampled, so Lightning must not inject a *second* distributed sampler. The
+        contract is therefore that the entry point constructs the ``Trainer`` with
+        ``use_distributed_sampler=False`` (wired in Phase 3); this module keeps the
+        loader as-is and retains the sampler as :attr:`_train_sampler`. Under DDP
+        that sampler is a ``DistributedSampler``, so the training loop calls
+        ``set_epoch`` on it each epoch for correct cross-epoch shuffling -- guarded
+        behind ``torch.distributed.is_initialized()`` (as ``v2.0/train.py`` does),
+        since the single-process ``RandomSampler`` has no ``set_epoch``. This
+        contract governs **both** the train and validation loaders, which share
+        the same ``distributed`` flag resolved at construction time.
 
     (b) **Normalizer.** The training dataset doubles as the normalization /
         statistics source — it holds ``constant_boundary_data``, ``land_mask``,
@@ -164,9 +170,10 @@ class ClimateDataModule(L.LightningDataModule):
 
         Returns:
             torch.utils.data.DataLoader: The training loader built in
-            :meth:`__init__`, including its manual
-            :class:`~torch.utils.data.distributed.DistributedSampler` (see
-            watch-point (a) in the class docstring).
+            :meth:`__init__`, including its own sampler (a
+            :class:`~torch.utils.data.distributed.DistributedSampler` under DDP,
+            else a :class:`~torch.utils.data.RandomSampler`; see watch-point (a)
+            in the class docstring).
         """
         return self._train_loader
 
