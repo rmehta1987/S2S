@@ -47,11 +47,14 @@ See Also:
 """
 
 import os
+from datetime import timedelta
 
+import cf_xarray as cfxr  # noqa: F401  (registers the .cf accessor used in save_predictions)
 import lightning as L
 import numpy as np
 import torch
 import torch.cuda.nvtx as nvtx
+import xarray as xr
 
 from networks.pangu import PanguModel_Plasim
 from utils.losses import (
@@ -141,13 +144,25 @@ class TrainModule(L.LightningModule):
         ddp (bool): Whether the configured strategy is a DDP variant; controls
             ``sync_dist`` on logging calls.
         has_diagnostic (bool): Whether diagnostic variables are present (drives
-            the diagnostic-loss term and the batch unpacking).
+            the diagnostic-loss term, the batch unpacking, and the eval-forward
+            tuple arity in :meth:`predict`).
         num_ensemble_members (int): Ensemble size for the CRPS loss; ``> 1``
             activates :func:`to_ensemble_batch`.
+        inference_steps (int): Full autoregressive horizon for the netCDF save
+            path in :meth:`save_predictions` (derived as
+            ``max(forecast_lead_times)`` like ``v2.0/inference.py::__main__``).
+        predictions_dir (str | None): Directory the validation netCDF
+            predictions are written to (set by the entry point ``val.py`` via the
+            ``predictions_dir`` param key); ``None`` disables saving.
+        do_save_predictions (bool): Whether :meth:`validation_step` writes
+            netCDF predictions on rank 0 / batch 0 (requires both
+            ``params.save_predictions`` and a ``predictions_dir``).
 
     See Also:
         networks.pangu.PanguModel_Plasim: The wrapped architecture.
         data.datamodule.ClimateDataModule: Provides batches and the normalizer.
+        val.py: The Lightning validation/inference entry point that drives
+            ``trainer.validate`` against this module.
     """
 
     def __init__(self, params, normalizer=None) -> None:
@@ -230,6 +245,30 @@ class TrainModule(L.LightningModule):
         else:
             self.ddp = True
 
+        # --- inference / prediction-saving config (Phase 4) ---
+        # inference_steps is the full autoregressive horizon for the netCDF save
+        # path. The S2S config does not carry it (it is derived in
+        # v2.0/inference.py::__main__): with forecast_lead_times present it is
+        # max(forecast_lead_times), else (24*15)//timedelta_hours. We derive it
+        # the same way so save_predictions rolls out the full horizon the source
+        # saved, independent of the (shorter) per-lead-time scoring in predict().
+        if hasattr(params, "forecast_lead_times"):
+            self.inference_steps = int(max(params.forecast_lead_times))
+        else:
+            self.inference_steps = (24 * 15) // int(params.timedelta_hours)
+        # Where validation_step writes netCDF predictions (rank0/batch0). The
+        # entry point (val.py) sets a writable run dir via params['predictions_dir'];
+        # when absent, save_predictions is a no-op (so the Phase-2 training smoke,
+        # which has no predictions dir, never tries to write).
+        self.predictions_dir = (
+            params["predictions_dir"] if "predictions_dir" in params else None
+        )
+        # save_predictions toggle: only saves when explicitly enabled AND a
+        # predictions_dir is set (mirrors SNFO gating save off a config flag).
+        self.do_save_predictions = bool(
+            getattr(params, "save_predictions", False) and self.predictions_dir
+        )
+
         # The normalizer holds open HDF5 handles and is not picklable; exclude it
         # from the hparams snapshot (SNFO ignores its normalizer the same way).
         self.save_hyperparameters(ignore=["normalizer"])
@@ -247,8 +286,10 @@ class TrainModule(L.LightningModule):
         non-``None`` ``mask`` to the module device, so the in-loss
         ``weight * (pred - target)`` math sees same-device tensors.
 
-        Idempotent and safe to call from both :meth:`setup` and
-        :meth:`on_fit_start`.
+        Idempotent and safe to call from :meth:`setup`, :meth:`on_fit_start`,
+        and :meth:`on_validation_start` (the last is required for the
+        ``trainer.validate`` / inference path, where ``on_fit_start`` never
+        fires and ``setup`` runs before the module is moved to the GPU).
         """
         for loss_obj in (self.loss_obj_pl, self.loss_obj_sfc, self.loss_obj_diagnostic):
             if hasattr(loss_obj, "latitudes") and isinstance(
@@ -276,6 +317,21 @@ class TrainModule(L.LightningModule):
         module (and its buffers) are guaranteed to be on the training device, so
         re-pointing the loss tensors here is exact even if a strategy moved the
         module after :meth:`setup`.
+        """
+        self._move_losses_to_device()
+
+    def on_validation_start(self) -> None:
+        """Re-assert loss-tensor device placement at the start of validation.
+
+        Required for the ``trainer.validate`` / inference path (:mod:`val.py`):
+        :meth:`on_fit_start` does not fire there, and :meth:`setup` runs *before*
+        the module is moved to the GPU, so its re-pointing of ``loss.latitudes``
+        would capture the still-CPU buffer. ``on_validation_start`` fires after
+        the module (and its ``latitudes`` buffer) are on the validation device,
+        so the in-loss ``weight * (pred - target)`` math in
+        :class:`utils.losses.Latitude_weighted_CRPSLoss` sees same-device
+        tensors. Also fires during ``fit``'s validation phase (a harmless
+        idempotent re-assert).
         """
         self._move_losses_to_device()
 
@@ -769,18 +825,28 @@ class TrainModule(L.LightningModule):
         for step in range(max_lead_time):
             if _NVTX:
                 nvtx.range_push(f"val_model_forward_step{step}")
-            # TODO(phase-4): this 5-tuple unpack assumes has_diagnostic=True --
-            # the eval forward returns a 4-tuple when has_diagnostic is False
-            # (networks/pangu.py:623). It faithfully reproduces the source's
-            # has_diagnostic=True-only validate_one_epoch (v2.0/train.py:1314);
-            # branch on self.has_diagnostic when a non-diagnostic (or
-            # predict_delta=True) config first reaches validation in Phase 4.
-            val_output_surface, val_output_upper_air, val_output_diagnostic, _, _ = self.model(
-                val_input_surface,
-                constant_boundary_data,
-                val_varying_boundary_data[:, step],
-                val_input_upper_air,
-            )
+            # Eval-forward arity branches on has_diagnostic (Phase-4 resolution of
+            # the former TODO): PanguModel_Plasim.forward returns a 5-tuple
+            # ``(surface, upper_air, diagnostic, mu, sigma)`` when
+            # num_diagnostic_vars > 0 (networks/pangu.py:618) and a 4-tuple
+            # ``(surface, upper_air, mu, sigma)`` when there are no diagnostics
+            # (networks/pangu.py:623). The diagnostic path (the one the smoke
+            # exercises, test_midway.yaml has diagnostic_variables) is unchanged.
+            if self.has_diagnostic:
+                val_output_surface, val_output_upper_air, val_output_diagnostic, _, _ = self.model(
+                    val_input_surface,
+                    constant_boundary_data,
+                    val_varying_boundary_data[:, step],
+                    val_input_upper_air,
+                )
+            else:
+                val_output_surface, val_output_upper_air, _, _ = self.model(
+                    val_input_surface,
+                    constant_boundary_data,
+                    val_varying_boundary_data[:, step],
+                    val_input_upper_air,
+                )
+                val_output_diagnostic = None
             if _NVTX:
                 nvtx.range_pop()  # val_model_forward_step
 
@@ -806,21 +872,355 @@ class TrainModule(L.LightningModule):
         return loss_dict
 
     def validation_step(self, batch, batch_idx):
-        """Score a validation batch and log per-lead-time losses.
+        """Score a validation batch, log per-lead-time losses, optionally save.
 
         Mirrors the SNFO ``validation_step`` public shape: delegate the rollout
         and scoring to :meth:`predict`, then log each per-lead-time loss with
-        ``sync_dist=self.ddp``. The richer per-variable lwrmse logging,
-        plotting and prediction-saving of the source's ``validate_one_epoch``
-        are deferred to the Phase-4 inference path.
+        ``sync_dist=self.ddp``. When :attr:`do_save_predictions` is set, the
+        source's prediction-saving behaviour (``Stepper.validate_one_epoch`` ->
+        ``save_prediction``) is reproduced on rank 0 / batch 0 only -- matching
+        SNFO's ``if batch_idx == 0 and (not self.ddp or self.global_rank == 0)``
+        gate -- via :meth:`save_predictions`.
 
         Args:
             batch: A validation batch (see :meth:`predict`).
-            batch_idx: Lightning's batch index (unused).
+            batch_idx: Lightning's batch index (used to gate saving to batch 0).
         """
         loss_dict = self.predict(batch)
         for key, value in loss_dict.items():
             self.log(f"val/{key}", value, on_step=False, on_epoch=True, sync_dist=self.ddp)
+
+        if self.do_save_predictions and batch_idx == 0:
+            if not self.ddp or self.global_rank == 0:
+                self.save_predictions(batch)
+
+    @torch.no_grad()
+    def _rollout_for_save(self, batch):
+        """Full-horizon ensemble rollout + denormalisation for netCDF saving.
+
+        Ports the save-preparation core of
+        ``v2.0/inference.py::Stepper.validate_one_epoch`` (distinct from the
+        per-lead-time *scoring* rollout in :meth:`predict`): for each of the two
+        ensemble members it rolls the model out over the full
+        :attr:`inference_steps` horizon, stacking every step (the input state
+        plus each forecast) along a time axis, then **denormalises** the stacked
+        surface / upper-air / diagnostic trajectories with the dataset's
+        ``*_inv_transform`` (preserving normalize<->inverse symmetry exactly as
+        the source) and moves them to CPU numpy. The autoregressive feed-forward
+        (each step's prediction becomes the next step's input) is preserved.
+
+        The model is called in inference mode, so its tuple arity branches on
+        :attr:`has_diagnostic` (5-tuple with diagnostics / 4-tuple without; see
+        :meth:`predict`).
+
+        Args:
+            batch: A validation batch (see :meth:`predict` for the ordering).
+
+        Returns:
+            list[dict]: One dict per ensemble member, each with keys
+            ``"ens_id"`` (int), ``"surface"`` / ``"upper_air"`` /
+            ``"diagnostic"`` (numpy arrays of shape ``(B, T, ...)``; the
+            diagnostic entry is ``None`` when :attr:`has_diagnostic` is False)
+            and ``"start_times"`` (a list of ``datetime_class`` start times, one
+            per sample in the batch).
+
+        Raises:
+            RuntimeError: If no normalizer was supplied (no dataset to source the
+                ``*_inv_transform`` statistics / ``datetime_class`` from).
+        """
+        if self.n is None:
+            raise RuntimeError(
+                "TrainModule has no normalizer; pass "
+                "normalizer=datamodule.train_dataset to enable save_predictions."
+            )
+        if self.has_diagnostic:
+            (
+                val_input_surface,
+                val_input_upper_air,
+                _val_target_surface,
+                _val_target_upper_air,
+                _val_target_diagnostic,
+                val_varying_boundary_data,
+                times,
+            ) = batch
+        else:
+            (
+                val_input_surface,
+                val_input_upper_air,
+                _val_target_surface,
+                _val_target_upper_air,
+                val_varying_boundary_data,
+                times,
+            ) = batch
+
+        # Reconstruct the per-sample start times from the times tensor
+        # (year, month, day, hour), exactly as Stepper.validate_one_epoch does.
+        start_times = []
+        for i in range(times.shape[0]):
+            start_times.append(
+                self.n.datetime_class(
+                    int(times[i, 0].item()),
+                    int(times[i, 1].item()),
+                    int(times[i, 2].item()),
+                    hour=int(times[i, 3].item()),
+                )
+            )
+
+        # The save path does NOT ensemble-tile the inputs (unlike the scoring
+        # rollout in predict()): v2.0/inference.py::Stepper.validate_one_epoch
+        # keeps the raw batch and draws the ensemble by re-running the stochastic
+        # VAE model twice (the `for ens_id in range(2)` loop below). So build the
+        # constant boundary at the *raw* input batch size, WITHOUT the ensemble
+        # tiling _constant_boundary_for applies -- matching Stepper, which built
+        # constant_boundary_data at params.batch_size and never tiled it.
+        if self.constant_boundary_data is None:
+            raise RuntimeError(
+                "TrainModule has no constant_boundary_data; pass "
+                "normalizer=datamodule.train_dataset when constructing it."
+            )
+        batch_b = val_input_surface.shape[0]
+        constant_boundary_data = self.constant_boundary_data.unsqueeze(0).expand(
+            batch_b, -1, -1, -1
+        )
+
+        results = []
+        for ens_id in range(2):
+            if _NVTX:
+                nvtx.range_push(f"inference_save_ens_{ens_id}")
+            in_surface = val_input_surface
+            in_upper_air = val_input_upper_air
+
+            # Initialise the trajectory with the input state (matches the source,
+            # which seeds the lists with the input surface/upper-air and a zero
+            # diagnostic frame).
+            diag0 = torch.zeros(
+                (in_surface.shape[0], self.model.num_diagnostic_vars,
+                 in_surface.shape[2], in_surface.shape[3]),
+                dtype=in_surface.dtype, device=in_surface.device,
+            )
+            surf_traj = [in_surface]
+            upper_traj = [in_upper_air]
+            diag_traj = [diag0]
+
+            for time_step in range(self.inference_steps):
+                if _NVTX:
+                    nvtx.range_push(f"val_save_forward_step{time_step}")
+                if self.has_diagnostic:
+                    out_surface, out_upper_air, out_diagnostic, _, _ = self.model(
+                        in_surface,
+                        constant_boundary_data,
+                        val_varying_boundary_data[:, time_step],
+                        in_upper_air,
+                    )
+                else:
+                    out_surface, out_upper_air, _, _ = self.model(
+                        in_surface,
+                        constant_boundary_data,
+                        val_varying_boundary_data[:, time_step],
+                        in_upper_air,
+                    )
+                    out_diagnostic = diag0
+                surf_traj.append(out_surface)
+                upper_traj.append(out_upper_air)
+                diag_traj.append(out_diagnostic)
+                in_surface, in_upper_air = out_surface, out_upper_air
+                if _NVTX:
+                    nvtx.range_pop()  # val_save_forward_step
+
+            surf = torch.stack(surf_traj, dim=1)
+            upper = torch.stack(upper_traj, dim=1)
+            diag = torch.stack(diag_traj, dim=1)
+            B, T = surf.shape[:2]
+
+            # Denormalise on the flattened (B*T, ...) view, exactly as the source,
+            # then reshape back to (B, T, ...) and move to CPU numpy.
+            surf_np = (
+                self.n.surface_inv_transform(surf.view(B * T, *surf.shape[2:]))
+                .cpu().numpy().reshape(B, T, *surf.shape[2:])
+            )
+            upper_np = (
+                self.n.upper_air_inv_transform(upper.view(B * T, *upper.shape[2:]))
+                .cpu().numpy().reshape(B, T, *upper.shape[2:])
+            )
+            if self.has_diagnostic:
+                diag_np = (
+                    self.n.diagnostic_inv_transform(diag.view(B * T, *diag.shape[2:]))
+                    .cpu().numpy().reshape(B, T, *diag.shape[2:])
+                )
+            else:
+                diag_np = None
+
+            results.append({
+                "ens_id": ens_id,
+                "surface": surf_np,
+                "upper_air": upper_np,
+                "diagnostic": diag_np,
+                "start_times": start_times,
+            })
+            if _NVTX:
+                nvtx.range_pop()  # inference_save_ens
+        return results
+
+    def save_predictions(self, batch) -> None:
+        """Write per-sample netCDF predictions for a validation batch.
+
+        Faithful port of ``v2.0/inference.py::Stepper.save_prediction``: for each
+        ensemble member (from :meth:`_rollout_for_save`) and each sample whose
+        forecast start time is at 00 UTC, it builds an :class:`xarray.Dataset`
+        over the ``(time, level, latitude, longitude)`` coordinates and writes it
+        to ``{predictions_dir}/{nettype}_{run_num}_{dt}h_{steps}step_{YYYYMMDDHH}_ens_{ens}.nc``.
+        The 00 UTC filter, the CF axis attributes, and the per-variable
+        ``DataArray`` construction match the source.
+
+        Unlike ``Stepper.save_prediction`` this takes no ``experiment_dir`` /
+        ``config_filepath`` bookkeeping (that was entry-point state, not climate
+        logic); it writes straight to :attr:`predictions_dir`, which the entry
+        point sets and creates. Saving the dataset to disk is heavy
+        (xarray/cftime), so the smoke exercises this path on a small number of
+        batches; whether any file is actually written depends on the data start
+        hours (only 00 UTC samples are saved), which it logs.
+
+        Args:
+            batch: A validation batch (see :meth:`predict` for the ordering).
+
+        Raises:
+            RuntimeError: If :attr:`predictions_dir` is unset (the entry point
+                must set ``params['predictions_dir']`` before saving).
+        """
+        if self.predictions_dir is None:
+            raise RuntimeError(
+                "save_predictions called without predictions_dir set; the entry "
+                "point (val.py) must set params['predictions_dir']."
+            )
+        params = self.params
+        savedir = self.predictions_dir
+        os.makedirs(savedir, exist_ok=True)
+
+        if _NVTX:
+            nvtx.range_push("saving predictions...")
+        ens_results = self._rollout_for_save(batch)
+
+        n_written = 0
+        for res in ens_results:
+            ens_id = res["ens_id"]
+            surface_prediction = res["surface"]
+            upper_air_prediction = res["upper_air"]
+            diagnostic_prediction = res["diagnostic"]
+            start_times = res["start_times"]
+
+            for sample in range(surface_prediction.shape[0]):
+                time_range = xr.cftime_range(
+                    start_times[sample]
+                    + timedelta(hours=params["timedelta_hours"] * sample),
+                    start_times[sample]
+                    + timedelta(hours=params["timedelta_hours"]
+                                * (sample + self.inference_steps)),
+                    freq="%dh" % params["timedelta_hours"],
+                    inclusive="both",
+                )
+                coordinates = {
+                    "time": time_range,
+                    "level": params.levels,
+                    "latitude": params.lat,
+                    "longitude": params.lon,
+                }
+                if start_times[sample].strftime("%H") != "00":
+                    print(
+                        f"[save_predictions] skipping start time {start_times[sample]} "
+                        "(not 00UTC)", flush=True,
+                    )
+                    continue
+
+                run_num = params["run_num"] if "run_num" in params else "lightning"
+                filename = "%s_%s_%dh_%dstep_%s_ens_%s.nc" % (
+                    params.nettype, run_num, params["timedelta_hours"],
+                    self.inference_steps, start_times[sample].strftime("%Y%m%d%H"),
+                    ens_id,
+                )
+                dataset = xr.Dataset(
+                    data_vars=dict(),
+                    coords=coordinates,
+                    attrs=dict(description=(
+                        f"Prediction from {params.nettype} model run {run_num}")),
+                )
+                dataset["level"].attrs["axis"] = "Z"
+                dataset["latitude"].attrs["axis"] = "Y"
+                dataset["longitude"].attrs["axis"] = "X"
+                # This single line is required for guess_coord_axis to work.
+                dataset["level"].attrs["positive"] = "down"
+                dataset = dataset.cf.guess_coord_axis()
+
+                for idx, var in enumerate(self.n.surface_variables):
+                    dataset[var] = xr.DataArray(
+                        data=surface_prediction[sample, :, idx],
+                        dims=["time", "latitude", "longitude"],
+                        coords={
+                            "time": time_range,
+                            "latitude": dataset.latitude.values,
+                            "longitude": dataset.longitude.values,
+                        },
+                    )
+                for idx, var in enumerate(self.n.upper_air_variables):
+                    dataset[var] = xr.DataArray(
+                        data=upper_air_prediction[sample, :, idx],
+                        dims=["time", "level", "latitude", "longitude"],
+                        coords=coordinates,
+                    )
+                if self.has_diagnostic and diagnostic_prediction is not None:
+                    for idx, var in enumerate(self.n.diagnostic_variables):
+                        dataset[var] = xr.DataArray(
+                            data=diagnostic_prediction[sample, :, idx],
+                            dims=["time", "latitude", "longitude"],
+                            coords={
+                                "time": time_range,
+                                "latitude": dataset.latitude.values,
+                                "longitude": dataset.longitude.values,
+                            },
+                        )
+
+                dataset["latitude"] = dataset["latitude"].astype("float32").assign_attrs(
+                    {"long_name": "Latitude", "unit": "degrees_north"})
+                dataset["longitude"] = dataset["longitude"].astype("float32").assign_attrs(
+                    {"long_name": "Longitude", "unit": "degrees_east"})
+                dataset["time"] = dataset["time"].assign_attrs(
+                    {"long_name": "Forecast Valid Time"})
+                dataset["level"] = dataset["level"].astype("float32").assign_attrs(
+                    {"long_name": "Level", "unit": "hPa"})
+                dataset = dataset.chunk({"time": 1, "level": 1})
+                out_path = os.path.join(savedir, filename)
+                dataset.to_netcdf(out_path, "w")
+                n_written += 1
+                print(f"[save_predictions] wrote {out_path}", flush=True)
+        if _NVTX:
+            nvtx.range_pop()  # saving predictions...
+        print(
+            f"[save_predictions] {n_written} netCDF file(s) written to {savedir} "
+            f"(00UTC samples only)", flush=True,
+        )
+
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        """Roll out and save predictions for one batch under ``trainer.predict``.
+
+        The ``trainer.predict`` counterpart of the validation save path: it
+        writes per-sample netCDF predictions via :meth:`save_predictions` for
+        every batch (not just batch 0), reproducing the source
+        ``v2.0/inference.py::Stepper.predict`` loop, which saved every batch it
+        rolled out. The validation entry point ``val.py`` drives saving through
+        :meth:`validation_step` (``trainer.validate``); this method is the path
+        used when a caller drives ``trainer.predict`` against the
+        :meth:`data.datamodule.ClimateDataModule.predict_dataloader` instead.
+
+        Args:
+            batch: A validation/inference batch (see :meth:`predict`).
+            batch_idx: Lightning's batch index (unused; predict saves every batch).
+            dataloader_idx: Lightning's dataloader index (unused).
+
+        Returns:
+            None: Predictions are written to :attr:`predictions_dir` as a side
+            effect; there is no in-memory return.
+        """
+        self.save_predictions(batch)
+        return None
 
     def configure_optimizers(self):
         """Build the optimiser and LR scheduler, faithful to the source.

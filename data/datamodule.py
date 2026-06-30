@@ -12,8 +12,11 @@ Lightning's DDP strategy has initialized the process group -- by reproducing
 :func:`utils.data_loader_multifiles.get_data_loader`'s sampler choice and
 ``DataLoader`` settings against the prebuilt dataset (``setup`` does not call
 ``get_data_loader`` itself, which would re-read the HDF5 tree).
-The inference path (Phase 4) will route through
-:func:`utils.data_loader_multifiles.get_infer_data`.
+The inference path (Phase 4) routes through
+:func:`utils.data_loader_multifiles.get_infer_data` in
+:meth:`ClimateDataModule.predict_dataloader` (used by ``trainer.predict``); the
+``trainer.validate`` path used by :mod:`val.py` reuses :meth:`val_dataloader`,
+which wraps the same validate loader the canonical ``v2.0/inference.py`` reads.
 
 The ``utils.*`` imports resolve only when ``v2.0/`` is on ``PYTHONPATH``
 (``PYTHONPATH=v2.0/``), matching the rest of the ported tree.
@@ -26,7 +29,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from utils.data_loader_multifiles import (
     get_data_loader,  # noqa: F401  (canonical loader; referenced in docstrings; setup reproduces it without calling it)
-    get_infer_data,  # noqa: F401  (Phase 4 inference path; named in docstrings)
+    get_infer_data,  # Phase 4 inference loader (called from predict_dataloader)
     GetDataset,
 )
 
@@ -283,11 +286,44 @@ class ClimateDataModule(L.LightningDataModule):
         return None
 
     def predict_dataloader(self):
-        """Return the prediction dataloader.
+        """Return the prediction/inference dataloader (Phase 4).
+
+        Built lazily here via S2S's dedicated inference loader
+        :func:`utils.data_loader_multifiles.get_infer_data` -- which constructs
+        its own ``GetDataset(train=False, validate=...)`` plus a
+        ``DataLoader(sampler=None, persistent_workers=True, prefetch_factor=8)``
+        -- so the ``trainer.predict`` path uses the same dedicated loader the
+        canonical ``v2.0/inference.py`` would have used.
+
+        Note:
+            The canonical inference path in
+            :class:`v2.0/inference.py::Stepper` (read via ``get_data_loader(...,
+            train=False, validate=True)``) is the **same validate loader** this
+            module already exposes as :meth:`val_dataloader`; ``get_infer_data``
+            differs only by forcing ``sampler=None`` and adding
+            ``persistent_workers``/``prefetch_factor``. The entry point
+            :mod:`val.py` therefore drives inference through ``trainer.validate``
+            (reusing the already-built, already-smoked validation loader and the
+            rank0/batch0 save hook in
+            :meth:`modules.train_module.TrainModule.validation_step`); this
+            ``predict_dataloader`` exists so a ``trainer.predict`` driver can use
+            S2S's dedicated inference loader without losing it.
 
         Returns:
-            None: The prediction / inference path is wired in Phase 4 via
-            :func:`utils.data_loader_multifiles.get_infer_data`; mirrors the SNFO
-            template.
+            torch.utils.data.DataLoader: The inference loader from
+            :func:`utils.data_loader_multifiles.get_infer_data` (single-process;
+            no distributed sampler).
         """
-        return None
+        distributed = (
+            torch.distributed.is_available() and torch.distributed.is_initialized()
+        )
+        loader, _dataset = get_infer_data(
+            self.params,
+            self.params.data_dir,
+            distributed,
+            self.params.val_year_start,
+            self.params.val_year_end,
+            num_inferences=self.params.num_inferences,
+            validate=True,
+        )
+        return loader
