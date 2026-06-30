@@ -8,8 +8,10 @@ than reimplementing them: the HDF5-backed
 :meth:`ClimateDataModule.__init__` (so it is available as the normalizer before
 ``trainer.fit`` runs), and the train/validation ``DataLoader`` + sampler are
 built per-rank in :meth:`ClimateDataModule.setup` -- *inside* ``fit()``, after
-Lightning's DDP strategy has initialized the process group -- by delegating to
-:func:`utils.data_loader_multifiles.get_data_loader` with the prebuilt dataset.
+Lightning's DDP strategy has initialized the process group -- by reproducing
+:func:`utils.data_loader_multifiles.get_data_loader`'s sampler choice and
+``DataLoader`` settings against the prebuilt dataset (``setup`` does not call
+``get_data_loader`` itself, which would re-read the HDF5 tree).
 The inference path (Phase 4) will route through
 :func:`utils.data_loader_multifiles.get_infer_data`.
 
@@ -23,7 +25,7 @@ from torch.utils.data import DataLoader, RandomSampler
 from torch.utils.data.distributed import DistributedSampler
 
 from utils.data_loader_multifiles import (
-    get_data_loader,  # noqa: F401  (canonical loader; named in docstrings / setup parity)
+    get_data_loader,  # noqa: F401  (canonical loader; referenced in docstrings; setup reproduces it without calling it)
     get_infer_data,  # noqa: F401  (Phase 4 inference path; named in docstrings)
     GetDataset,
 )
@@ -177,9 +179,10 @@ class ClimateDataModule(L.LightningDataModule):
         across ranks). In a single-process run (no process group) it is a
         :class:`torch.utils.data.RandomSampler`, leaving the existing 1-GPU path
         unchanged. The loader/sampler construction reproduces
-        :func:`utils.data_loader_multifiles.get_data_loader` verbatim, but against
-        the datasets already built in :meth:`__init__` so the heavy HDF5 reads are
-        not repeated.
+        :func:`utils.data_loader_multifiles.get_data_loader`'s sampler-selection
+        logic (and, via :meth:`_make_loader`, its ``DataLoader`` settings) against
+        the datasets already built in :meth:`__init__`, so the heavy HDF5 reads are
+        not repeated; ``setup`` does not call ``get_data_loader`` itself.
 
         Idempotent: Lightning may call :meth:`setup` more than once (e.g. ``fit``
         then ``validate``); the train loader is built only when it does not
@@ -194,7 +197,7 @@ class ClimateDataModule(L.LightningDataModule):
         )
 
         # Train loader: built for the "fit" stage (or when called with no stage).
-        # The sampler choice mirrors get_data_loader lines 93-95 exactly:
+        # The sampler choice mirrors the sampler block in get_data_loader:
         # DistributedSampler under a live process group, else RandomSampler.
         if stage in (None, "fit") and self._train_loader is None:
             self._train_sampler = (
@@ -221,7 +224,7 @@ class ClimateDataModule(L.LightningDataModule):
         """Construct a ``DataLoader`` matching ``get_data_loader``'s settings.
 
         Reproduces the ``DataLoader(...)`` call in
-        :func:`utils.data_loader_multifiles.get_data_loader` (lines 98-107)
+        :func:`utils.data_loader_multifiles.get_data_loader`
         verbatim -- same ``batch_size`` / ``num_workers`` / ``shuffle=False``
         (the sampler owns ordering) / ``drop_last`` / ``pin_memory`` -- so the
         deferred-construction path stays byte-for-byte faithful to the canonical
