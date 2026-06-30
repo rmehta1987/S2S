@@ -1,27 +1,37 @@
-# `common/` — shared Lightning-port utilities (Phase 0 scaffold)
+# `common/` — shared Lightning-port utilities
+
+> Status: port complete through Phase 6. The "Contents" list below is the
+> original Phase-0 plan, retained as build history; landed entries are
+> present-tense and entries never created (no S2S analogue) are marked.
 
 This directory mirrors `$SNFO_DIR/common/` (`/project/pedramh/shared/anthonyz/common/`)
 as part of the S2S -> PyTorch Lightning port (restructure-in-place; the `v2.0/`
 originals are left untouched).
 
-## Target contents (populated in later phases — see the S2S -> Lightning mapping)
+## Contents
 
-- `utils.py` — config + checkpoint helpers, mirrors `common/utils.py`
-  (`get_yaml`, `save_yaml`, `dict2namespace`, assemble/disassemble helpers).
-- `loss.py` — shared metrics, mirrors `common/loss.py`
-  (`latitude_weighted_rmse`). The S2S training losses themselves are
-  **reused** from `v2.0/utils/losses.py`, not reimplemented here.
-- `plotting.py` — mirrors `common/plotting.py`.
-- `bench_callback.py` — `BenchCallback(L.Callback)`, mirrors
-  `common/bench_callback.py`; this is where S2S's in-loop `S2S_BENCH` / NVTX
-  instrumentation moves onto Lightning hooks (Phase 3).
+- `bench_callback.py` — **landed.** `BenchCallback(L.Callback)`, mirrors
+  `$SNFO_DIR/common/bench_callback.py`; this is where S2S's in-loop `S2S_BENCH` /
+  NVTX instrumentation moved onto Lightning hooks (Phase 3).
+- `set_epoch_callback.py` — **landed.** `SetEpochCallback(L.Callback)` (no SNFO
+  analogue); calls `set_epoch` on S2S's own `DistributedSampler` each epoch,
+  needed because the entry points run `use_distributed_sampler=False`.
+- `utils.py` — **not ported.** SNFO's `common/utils.py` (`get_yaml`,
+  `dict2namespace`, ...) is for its flat YAML config; S2S keeps its own
+  `v2.0/utils/YParams.py` + sectioned YAML (a necessary-S2S divergence settled
+  at Phase 5), so no `common/utils.py` was created.
+- `loss.py` — **not ported.** S2S's training losses are **reused** from
+  `v2.0/utils/losses.py`, not reimplemented; SNFO's `common/loss.py`
+  (`latitude_weighted_rmse`) has no S2S consumer.
+- `plotting.py` — **not ported** (no S2S analogue needed).
 
 ## Packaging note
 
 SNFO's source packages contain **no `__init__.py`** — they are PEP 420 implicit
-namespace packages imported absolutely (`from common.utils import ...`) with the
-repo root on the path. This scaffold mirrors that exactly: **do not add
-`__init__.py` here.** Run Lightning entry points from the repo root.
+namespace packages imported absolutely (e.g.
+`from common.bench_callback import BenchCallback`) with the repo root on the
+path. This scaffold mirrors that exactly: **do not add `__init__.py` here.** Run
+Lightning entry points from the repo root.
 
 ## Environment (LPORT_ENV — recorded for later phases)
 

@@ -1,13 +1,21 @@
-# `modules/models/` — ported model definitions (Phase 0 scaffold)
+# `modules/models/` — ported model definitions
+
+> Status: port complete through Phase 6. This directory mirrors SNFO's
+> `modules/models/` slot but is an intentional **empty placeholder** — see below.
 
 Mirrors `$SNFO_DIR/modules/models/` (`/project/pedramh/shared/anthonyz/modules/models/`,
 which holds `AE.py`, `Decoder.py`, `DiT.py`, `Unet.py`).
 
-This is where S2S's `PanguModel_Plasim` (and its blocks) from
-`v2.0/networks/pangu.py` will be placed during the port. The model is the **only**
-intended material difference between the S2S and SNFO trees — everything else
-(entry points, DataModule, LightningModule scaffolding, bench harness, common
-utils) converges on SNFO's shape.
+This is SNFO's slot for model definitions. In S2S, `PanguModel_Plasim` (and its
+blocks `EarthSpecificLayer` / `EarthAttention3D` / patch embed/recover) is
+**reused in place from `v2.0/networks/pangu.py`** — it is *not* copied here.
+`modules/train_module.py::TrainModule` imports it directly
+(`from networks.pangu import PanguModel_Plasim`, `modules/train_module.py:59`)
+and holds it as `self.model`. So this directory stays an empty placeholder
+(this README only). The model is the **only** intended material difference
+between the S2S and SNFO trees — everything else (entry points, DataModule,
+LightningModule scaffolding, bench harness, common utils) converges on SNFO's
+shape.
 
 Reuse, do not rewrite: the architecture in `v2.0/networks/pangu.py` is held as
 `self.model` inside `modules/train_module.py::TrainModule`, not reimplemented.
