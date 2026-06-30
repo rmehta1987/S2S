@@ -41,7 +41,12 @@ data/stats/time_means_sfc.npy
 
 logs/
 results/
-data/
+# Lightning-port: data/ is now the DataModule package, so ignore its *contents*
+# (local datasets, stats, __pycache__) but keep its Python sources tracked. A
+# blanket `data/` would exclude the directory itself and block re-including files
+# under it; ignoring `data/*` (contents) lets `!data/*.py` re-include sources.
+data/*
+!data/*.py
 # tests/
 
 core*
