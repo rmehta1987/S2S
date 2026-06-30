@@ -139,7 +139,11 @@ def main(args):
     n_gpus = len(devices) if isinstance(devices, (list, tuple)) else int(devices)
     batch_per_gpu = params["batch_size"]
     strategy_name = args.strategy or (params["strategy"] if "strategy" in params else "auto")
-    ddp = strategy_name in ("ddp", "ddp_find_unused_parameters_true") and n_gpus > 1
+    # C2 / P2-1: DDP is decided by the strategy name alone (not n_gpus), so a
+    # single-device --strategy ddp still takes the explicit DDPStrategy path with
+    # static_graph=True rather than the bare "ddp" string (static_graph=False).
+    # Mirrors train.py::_is_ddp.
+    ddp = strategy_name in ("ddp", "ddp_find_unused_parameters_true")
 
     # C6: set _lightning_ddp BEFORE constructing TrainModule.
     params["_lightning_ddp"] = ddp

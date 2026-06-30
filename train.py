@@ -157,21 +157,28 @@ def _resolve_devices(args_devices, params):
     return 1
 
 
-def _is_ddp(strategy_name, devices) -> bool:
+def _is_ddp(strategy_name) -> bool:
     """Decide whether the run is a DDP run (drives ``_lightning_ddp``).
+
+    Determined by the strategy name **alone**, not the device count: a
+    ``--strategy ddp`` run must take the explicit
+    ``DDPStrategy(find_unused_parameters=False, static_graph=True)`` path (C2)
+    even on a single device, otherwise it silently falls through to the bare
+    ``"ddp"`` string strategy (``static_graph=False``) and the C2 invariant is
+    bypassed. A single-device default run uses ``--strategy auto`` (or no
+    ``strategy`` in the config), which is not DDP, so the existing 1-GPU path is
+    unaffected.
 
     Args:
         strategy_name: The resolved strategy string (e.g. ``"ddp"`` or
             ``"auto"``).
-        devices: The resolved device spec (int or list).
 
     Returns:
-        bool: ``True`` when the strategy selects DDP *and* more than one device
-        is requested; ``False`` otherwise. ``self.ddp`` on the module (which
-        drives ``sync_dist`` on logging) is set from this.
+        bool: ``True`` when the strategy selects DDP, ``False`` otherwise.
+        ``self.ddp`` on the module (which drives ``sync_dist`` on logging) is set
+        from this.
     """
-    n_devices = len(devices) if isinstance(devices, (list, tuple)) else int(devices)
-    return strategy_name in ("ddp", "ddp_find_unused_parameters_true") and n_devices > 1
+    return strategy_name in ("ddp", "ddp_find_unused_parameters_true")
 
 
 def process_args(args, params):
@@ -206,7 +213,7 @@ def process_args(args, params):
         params["wandb_mode"] = args.wandb_mode
 
     # has_diagnostic / num_ensemble_members: same defensive derivation as
-    # v2.0/train.py::__main__ (lines 1825-1835).
+    # v2.0/train.py::__main__.
     if "diagnostic_variables" in params and len(params.diagnostic_variables) > 0:
         params["has_diagnostic"] = True
     elif "has_diagnostic" not in params:
@@ -254,7 +261,7 @@ def main(args):
 
     devices = tk["devices"]
     strategy_name = tk["strategy_name"]
-    ddp = _is_ddp(strategy_name, devices)
+    ddp = _is_ddp(strategy_name)
 
     # C6: set _lightning_ddp BEFORE constructing TrainModule so self.ddp (and
     # thus sync_dist on logging) matches the actual strategy.
