@@ -834,12 +834,13 @@ class TrainModule(L.LightningModule):
         For ``OneCycleLR`` the total step count needs ``steps_per_epoch``; under
         Lightning that is taken from the trainer's
         ``estimated_stepping_batches`` (``max_epochs * steps_per_epoch``) so the
-        schedule spans the configured run. ``ReduceLROnPlateau`` here monitors
-        ``val/valid_loss_1step`` (the 1-step lead-time validation loss). The
-        source (``v2.0/train.py``) stepped the plateau scheduler on an
-        *aggregate* ``valid_loss`` summed over all lead times; the port logs only
-        per-lead-time keys (``val/valid_loss_{n}step``), so the 1-step loss is
-        used as the monitored proxy -- a deliberate change, not a fidelity claim.
+        schedule spans the configured run. ``ReduceLROnPlateau`` monitors
+        ``val/valid_loss_1step`` (the 1-step lead-time validation loss), which is
+        faithful to the source: ``v2.0/train.py`` stepped the plateau scheduler on
+        ``valid_logs['valid_loss']`` (``train.py:623``), and that ``valid_loss`` is
+        accumulated only at the first lead time (``if step == 0`` in
+        ``validate_one_epoch``, ``train.py:1333-1334``) -- i.e. the 1-step loss.
+        The all-lead-times ``multi_step_losses`` accumulator is never monitored.
 
         Returns:
             tuple | torch.optim.Optimizer: ``([optimizer], [scheduler])`` when a
