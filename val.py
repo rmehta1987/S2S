@@ -39,7 +39,7 @@ they are entry-point / Trainer-level concerns:
 
 The ``utils.*`` / ``networks.*`` imports reused transitively by the modules
 resolve only when ``v2.0/`` is on ``PYTHONPATH``
-(``PYTHONPATH=v2.0/:<repo-root>``).
+(``PYTHONPATH=v2.0:.``).
 
 Usage:
     PYTHONPATH=v2.0:. python val.py --yaml_config configs/test_midway.yaml \\

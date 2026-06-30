@@ -827,11 +827,11 @@ class TrainModule(L.LightningModule):
                 nvtx.range_push(f"val_model_forward_step{step}")
             # Eval-forward arity branches on has_diagnostic (Phase-4 resolution of
             # the former TODO): PanguModel_Plasim.forward returns a 5-tuple
-            # ``(surface, upper_air, diagnostic, mu, sigma)`` when
-            # num_diagnostic_vars > 0 (networks/pangu.py:618) and a 4-tuple
-            # ``(surface, upper_air, mu, sigma)`` when there are no diagnostics
-            # (networks/pangu.py:623). The diagnostic path (the one the smoke
-            # exercises, test_midway.yaml has diagnostic_variables) is unchanged.
+            # ``(surface, upper_air, diagnostic, mu, sigma)`` from its
+            # ``if self.num_diagnostic_vars > 0`` branch and a 4-tuple
+            # ``(surface, upper_air, mu, sigma)`` from the ``else`` branch (no
+            # diagnostics). The diagnostic path (the one the smoke exercises,
+            # test_midway.yaml has diagnostic_variables) is unchanged.
             if self.has_diagnostic:
                 val_output_surface, val_output_upper_air, val_output_diagnostic, _, _ = self.model(
                     val_input_surface,
@@ -912,6 +912,13 @@ class TrainModule(L.LightningModule):
         The model is called in inference mode, so its tuple arity branches on
         :attr:`has_diagnostic` (5-tuple with diagnostics / 4-tuple without; see
         :meth:`predict`).
+
+        Note:
+            The saved ensemble count is fixed at 2 (faithful to the source's
+            ``for ens_id in range(2)``), intentionally independent of
+            :attr:`num_ensemble_members`, which sizes only the *scoring*
+            ensemble in :meth:`predict`. Re-coupling them would silently diverge
+            from the canonical inference output.
 
         Args:
             batch: A validation batch (see :meth:`predict` for the ordering).
@@ -1203,9 +1210,13 @@ class TrainModule(L.LightningModule):
 
         The ``trainer.predict`` counterpart of the validation save path: it
         writes per-sample netCDF predictions via :meth:`save_predictions` for
-        every batch (not just batch 0), reproducing the source
-        ``v2.0/inference.py::Stepper.predict`` loop, which saved every batch it
-        rolled out. The validation entry point ``val.py`` drives saving through
+        every batch (not just batch 0). The source
+        ``v2.0/inference.py::Stepper.predict`` delegates to
+        ``Stepper.validate_one_epoch``, whose batch loop both rolls out and
+        saves (capped there at ``i > 5``); Lightning owns batch iteration here,
+        so that per-batch cap is expressed via the Trainer's
+        ``limit_predict_batches`` instead. The validation entry point ``val.py``
+        drives saving through
         :meth:`validation_step` (``trainer.validate``); this method is the path
         used when a caller drives ``trainer.predict`` against the
         :meth:`data.datamodule.ClimateDataModule.predict_dataloader` instead.
