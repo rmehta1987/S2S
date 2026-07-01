@@ -3,8 +3,8 @@
 #SBATCH --time=00:45:00
 #SBATCH -p pedramh-gpu
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:4
 #SBATCH --exclusive
 #SBATCH --mem=0
@@ -40,7 +40,8 @@
 #   * CSV: port_bench_results.csv (same schema as v2.0 bench_results.csv) —
 #     compare samples_per_s_wall and peak_mem_gb_max_rank.
 #
-# Output: ${SLURM_SUBMIT_DIR}/nsys_port_bench_eager_<run>.nsys-rep
+# Output: ${SLURM_SUBMIT_DIR}/nsys_port_bench_eager_<run>_rank0.nsys-rep (+ _rank1..3)
+# Launch: srun with --ntasks-per-node=4 (Lightning's SLURM launcher needs ntasks == devices).
 # ============================================================================
 
 ulimit -l unlimited
@@ -96,14 +97,18 @@ echo "NUM_GPUS=${NUM_GPUS}  config=${config_file}  per-GPU batch=2  run_num=${ru
 NSYS_OUT="${SLURM_SUBMIT_DIR}/nsys_port_bench_eager_${run_num}"
 echo "nsys output: ${NSYS_OUT}.nsys-rep"
 
-# Lightning's own DDP subprocess launcher spawns one rank per --devices id; nsys
-# follows the child processes. (For a NCCL-free, single-process kernel/NVTX
-# comparison, swap to: --devices 0 --strategy auto.)
-nsys profile \
+# Lightning under SLURM uses the SLURM launcher, which REQUIRES --ntasks-per-node
+# to equal the device count (the earlier ntasks-per-node=1 caused Lightning's
+# "devices=4 does not match --ntasks-per-node=1" abort). srun starts the 4 ranks;
+# nsys writes one rank-tagged report per rank — use the _rank0 report to compare
+# against the v2.0 rank-0 baseline.
+# (NCCL-free single-GPU alternative: set ntasks-per-node=1 + gres=gpu:1 above and
+#  drop `srun`, running: python "${REPO}/bench.py" --devices 0 --strategy auto.)
+srun nsys profile \
     --trace=cuda,nvtx,cudnn,cublas,osrt \
     --capture-range=cudaProfilerApi \
     --capture-range-end=stop \
-    --output="${NSYS_OUT}" \
+    --output="${NSYS_OUT}_rank%q{SLURM_PROCID}" \
     --force-overwrite=true \
     --nic-metrics=true \
     python "${REPO}/bench.py" \
@@ -113,5 +118,5 @@ nsys profile \
         --devices 0 1 2 3 \
         --strategy ddp
 
-echo "Profile written: ${NSYS_OUT}.nsys-rep"
-echo "Compare to the v2.0 baseline: nsys stats ${NSYS_OUT}.nsys-rep  (and diff port_bench_results.csv vs bench_results.csv on samples_per_s_wall)"
+echo "Profiles written: ${NSYS_OUT}_rank0.nsys-rep (+ _rank1..3)"
+echo "Compare to the v2.0 baseline: nsys stats ${NSYS_OUT}_rank0.nsys-rep  (and diff port_bench_results.csv vs v2.0/HPC_scripts/bench_results.csv on samples_per_s_wall)"
